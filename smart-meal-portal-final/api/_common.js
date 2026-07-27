@@ -1,0 +1,6 @@
+import crypto from 'node:crypto';
+const NEIS='https://open.neis.go.kr/hub';
+export async function neis(path,params={}){const key=process.env.NEIS_API_KEY;if(!key)throw new Error('NEIS_API_KEY가 없습니다.');const q=new URLSearchParams({KEY:key,Type:'json',pIndex:'1',pSize:'100',...params});const r=await fetch(`${NEIS}/${path}?${q}`);if(!r.ok)throw new Error(`나이스 오류 ${r.status}`);const j=await r.json();const head=j?.[path]?.[0]?.head;const code=head?.[1]?.RESULT?.CODE;if(code&&code!=='INFO-000'){if(code==='INFO-200')return[];throw new Error(head?.[1]?.RESULT?.MESSAGE||'나이스 조회 오류');}return j?.[path]?.[1]?.row||[]}
+export function json(res,status,data){res.status(status).json(data)}
+export function hashPassword(p,salt){return crypto.createHash('sha256').update(`${salt}:${p}`).digest('hex')}
+export async function supabase(path,options={}){const url=process.env.SUPABASE_URL,key=process.env.SUPABASE_SERVICE_ROLE_KEY;if(!url||!key)throw new Error('Supabase 환경변수가 없습니다.');const r=await fetch(`${url}/rest/v1/${path}`,{...options,headers:{apikey:key,Authorization:`Bearer ${key}`,'Content-Type':'application/json',Prefer:'return=representation',...(options.headers||{})}});if(!r.ok)throw new Error(await r.text());return r.status===204?null:r.json()}
