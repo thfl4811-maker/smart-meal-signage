@@ -14,9 +14,106 @@ function parseRows(rows){const out={};rows.filter(r=>r.mealCode==='2').forEach(r
 function parseDish(t){t=t.replace(/<[^>]+>/g,'').trim();if(!t)return null;const al=[];for(const m of t.matchAll(/\(([\d.]+)\)/g))m[1].split('.').map(Number).forEach(n=>n>=1&&n<=19&&al.push(n));let name=t.replace(/\(([\d.]+)\)/g,'').trim(),type=/자율/.test(name)?'self':'normal';return{name,allergy:[...new Set(al)],type,category:'',order:0}}
 async function applySaved(){try{const r=await fetch(`/api/project?office=${school.officeCode}&school=${school.schoolCode}&month=${month}`),j=await r.json();if(j?.payload?.days)data=j.payload.days}catch{}}
 function setDefaultDate(){const today=new Date().toISOString().slice(0,10);date=data[today]?today:Object.keys(data).sort()[0]||''}
-async function loadExcel(e){const f=e.target.files[0];if(!f)return;const wb=XLSX.read(await f.arrayBuffer(),{type:'array'}),ws=wb.Sheets[wb.SheetNames[0]],rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});data={};let cur='';for(const row of rows){const text=row.filter(Boolean).join(' ');const dm=text.match(/(\d{1,2})\s*[월./-]\s*(\d{1,2})\s*일?/);if(dm)cur=`${new Date().getFullYear()}-${String(dm[1]).padStart(2,'0')}-${String(dm[2]).padStart(2,'0')}`;if(cur&&row.length){const candidates=row.map(String).filter(x=>x&&x.length>2&&!/월간|식단|영양|에너지|단백질|칼슘|철/.test(x));if(candidates.length){data[cur]??={date:cur,items:[],calories:'',nutrient:{},note:'',edited:false};candidates.forEach(x=>{if(!data[cur].items.some(i=>i.name===x))data[cur].items.push(parseDish(x))})}}}school={officeCode:'EXCEL',schoolCode:'LOCAL',schoolName:f.name.replace(/\.[^.]+$/,'')};source='excel';month=Object.keys(data)[0]?.slice(0,7)||month;setDefaultDate();renderHome();renderTab()}
+async function loadExcel(e){
+  const f=e.target.files[0];
+  if(!f)return;
+
+  try{
+    const book=XLSX.read(await f.arrayBuffer(),{type:'array'});
+    const ws=book.Sheets[book.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
+
+    let year='',mon='',schoolName='';
+    for(const row of rows){
+      for(const cell of row){
+        const text=String(cell||'').trim();
+        const ym=text.match(/조회년월\s*:\s*(\d{4})년\s*(\d{1,2})월/);
+        if(ym){year=ym[1];mon=String(ym[2]).padStart(2,'0')}
+        if(!schoolName && /학교$/.test(text) && !/조회|월간|식단/.test(text)) schoolName=text;
+      }
+    }
+
+    if(!year||!mon) throw Error('엑셀에서 조회 연월을 찾지 못했습니다.');
+
+    const parsed={};
+
+    const parseExcelMeal=(cell,dateKey)=>{
+      const raw=String(cell||'').replace(/\r/g,'').trim();
+      if(!raw || raw==='0') return null;
+
+      const lines=raw.split('\n').map(x=>x.trim()).filter(Boolean);
+      const energyIndex=lines.findIndex(x=>/^\*\s*에너지\/단백질\/칼슘\/철/.test(x));
+
+      let menuLines=energyIndex>=0 ? lines.slice(0,energyIndex) : lines.slice();
+      menuLines=menuLines.filter(x=>x!=='[식단]' && x!=='중식' && x!=='0');
+
+      let calories='', nutrient={};
+      if(energyIndex>=0 && lines[energyIndex+1]){
+        const nums=lines[energyIndex+1].replace(/,/g,'').split('/').map(x=>x.trim());
+        if(nums[0]) calories=`${nums[0]} Kcal`;
+        if(nums[1]) nutrient['단백질']={value:nums[1],unit:'g'};
+        if(nums[2]) nutrient['칼슘']={value:nums[2],unit:'mg'};
+        if(nums[3]) nutrient['철분']={value:nums[3],unit:'mg'};
+      }
+
+      const items=menuLines.map(parseDish).filter(Boolean);
+      if(!items.length) return null;
+
+      return {date:dateKey,items,calories,nutrient,note:'',edited:false};
+    };
+
+    for(let r=0;r<rows.length-1;r++){
+      const dateRow=rows[r]||[];
+      const mealRow=rows[r+1]||[];
+
+      const numericDates=[];
+      for(let c=0;c<dateRow.length;c++){
+        const value=String(dateRow[c]??'').trim();
+        if(/^\d{1,2}$/.test(value)){
+          const day=Number(value);
+          if(day>=1&&day<=31) numericDates.push({c,day});
+        }
+      }
+
+      if(!numericDates.length) continue;
+
+      const looksLikeMealRow=mealRow.some(cell=>{
+        const t=String(cell||'');
+        return /\n/.test(t) || /\*\s*에너지\/단백질\/칼슘\/철/.test(t);
+      });
+      if(!looksLikeMealRow) continue;
+
+      for(const {c,day} of numericDates){
+        const dateKey=`${year}-${mon}-${String(day).padStart(2,'0')}`;
+        const meal=parseExcelMeal(mealRow[c],dateKey);
+        if(meal) parsed[dateKey]=meal;
+      }
+    }
+
+    if(!Object.keys(parsed).length){
+      throw Error('날짜별 식단을 찾지 못했습니다. 나이스 월간식단 엑셀 파일인지 확인하세요.');
+    }
+
+    data=parsed;
+    school={
+      officeCode:'EXCEL',
+      schoolCode:`LOCAL-${year}${mon}`,
+      schoolName:schoolName||f.name.replace(/\.[^.]+$/,'')
+    };
+    source='excel';
+    month=`${year}-${mon}`;
+    localStorage.setItem('meal_school',JSON.stringify(school));
+    setDefaultDate();
+    renderHome();
+    renderTab();
+    alert(`${school.schoolName} ${year}년 ${Number(mon)}월 식단 ${Object.keys(data).length}일을 불러왔습니다.`);
+  }catch(err){
+    alert(`엑셀 업로드 실패: ${err.message}`);
+    e.target.value='';
+  }
+}
 function renderTab(){if(!$('#content'))return;({month:renderMonth,day:renderDay,edit:renderEdit,detail:renderDetail}[tab]||renderMonth)()}
-function renderMonth(){const cards=Object.keys(data).sort().map(d=>{const x=data[d],dt=new Date(d+'T00:00:00');return `<article class="daycard" data-date="${d}"><div class="daytop"><b>${dt.getMonth()+1}월 ${dt.getDate()}일 ${'일월화수목금토'[dt.getDay()]}요일</b>${x.edited?'<span>수정됨</span>':''}</div>${x.items.map((i,k)=>`<div class="mrow ${i.type}">${icon(i.name)} ${esc(i.name)} ${i.allergy.length?`<small>${i.allergy.join('·')}</small>`:''}</div>`).join('')}<footer>${esc(x.calories||'영양정보 없음')}</footer></article>`}).join('');$('#content').innerHTML=`<div class="monthhead"><h2>${month} 전체 식단</h2><button class="ghost">전체 식단 카드</button></div><section class="monthgrid">${cards||'<div class="empty">식단이 없습니다.</div>'}</section>`;$$('.daycard').forEach(c=>c.onclick=()=>{date=c.dataset.date;tab='day';$$('[data-tab]').forEach(x=>x.classList.toggle('active',x.dataset.tab==='day'));renderDay()})}
+function renderMonth(){const cards=Object.keys(data).sort().map(d=>{const x=data[d],dt=new Date(d+'T00:00:00');const dayHit=allergyOn&&x.items.some(i=>i.allergy.some(n=>allergies.has(n)));return `<article class="daycard ${dayHit?'allergy-day':''}" data-date="${d}"><div class="daytop"><b>${dt.getMonth()+1}월 ${dt.getDate()}일 ${'일월화수목금토'[dt.getDay()]}요일</b><div>${dayHit?'<span class="allergy-badge">알레르기 주의</span>':''}${x.edited?'<span>수정됨</span>':''}</div></div>${x.items.map(i=>{const hit=allergyOn&&i.allergy.some(n=>allergies.has(n));return `<div class="mrow ${i.type} ${hit?'allergy-hit':''}">${icon(i.name)} ${esc(i.name)} ${i.allergy.length?`<small>${i.allergy.join('·')}</small>`:''}${hit?'<b class="mini-warn">주의</b>':''}</div>`}).join('')}<footer>${esc(x.calories||'영양정보 없음')}</footer></article>`}).join('');$('#content').innerHTML=`<div class="monthhead"><div><h2>${month} 전체 식단</h2>${filterBanner()}</div><button class="ghost">전체 식단 카드</button></div><section class="monthgrid">${cards||'<div class="empty">식단이 없습니다.</div>'}</section>`;$$('.daycard').forEach(c=>c.onclick=()=>{date=c.dataset.date;tab='day';$$('[data-tab]').forEach(x=>x.classList.toggle('active',x.dataset.tab==='day'));renderDay()})}
 function renderDay(){const x=data[date];if(!x)return $('#content').innerHTML='<div class="empty">식단이 없습니다.</div>';const dt=new Date(date+'T00:00:00');$('#content').innerHTML=`<section class="daybar"><button id="prev">‹</button><div><h2>${dt.getFullYear()}년 ${dt.getMonth()+1}월 ${dt.getDate()}일</h2><p>${'일월화수목금토'[dt.getDay()]}요일 중식</p></div><button id="next">›</button><button id="today">오늘의 식단</button></section>${filterBanner()}<section class="layout"><div class="dishgrid">${x.items.map(dishCard).join('')}</div><aside><section class="nutrition"><h3>오늘의 영양정보</h3>${nutrition(x)}</section><section class="edu"><h3>💡 오늘의 영양교육</h3>${education(x)}</section></aside></section>`;$('#prev').onclick=()=>move(-1);$('#next').onclick=()=>move(1);$('#today').onclick=()=>{const t=new Date().toISOString().slice(0,10);if(data[t]){date=t;renderDay()}else alert('오늘은 등록된 급식이 없습니다.')};}
 function dishCard(i){const hit=allergyOn&&i.allergy.some(n=>allergies.has(n));return `<article class="dish ${i.type} ${hit?'warn':''}"><span>${i.type==='choiceA'?'선택급식 A':i.type==='choiceB'?'선택급식 B':i.type==='self'?'자율배식':'MENU'}</span><h3>${icon(i.name)} ${esc(i.name)}</h3><p>${i.allergy.length?'알레르기 '+i.allergy.join('·'):'알레르기 표시 없음'}</p>${hit?'<b class="warnmark">주의</b>':''}</article>`}
 function nutrition(x){const keys=['단백질','칼슘','철분'];return `<div class="nut"><span>에너지</span><b>${esc(x.calories||'-')}</b></div>`+keys.map(k=>`<div class="nut"><span>${k}</span><b>${x.nutrient[k]?`${x.nutrient[k].value} ${x.nutrient[k].unit}`:'-'}</b></div>`).join('')}
@@ -28,7 +125,13 @@ function applyRow(tr){const x=data[tr.dataset.d].items[+tr.dataset.i];x.name=tr.
 function replaceAll(){const a=prompt('찾을 내용'),b=a!==null?prompt('바꿀 내용',''):null;if(a===null||b===null)return;Object.values(data).forEach(d=>d.items.forEach(i=>{i.name=i.name.split(a).join(b)}));renderEdit()}
 function renderDetail(){if(!date)setDefaultDate();const x=data[date];$('#content').innerHTML=`<section class="editor"><div class="edithead"><h2>${date} 상세 편집</h2><button id="detailSave" class="primary">이 날짜 저장</button></div><textarea id="note" placeholder="오늘의 안내문">${esc(x?.note||'')}</textarea><p>메뉴 추가·삭제와 세부 편집은 월 전체 편집에서 진행합니다.</p></section>`;$('#detailSave').onclick=()=>{x.note=$('#note').value;x.edited=true;saveProject()}}
 async function saveProject(){$$('tbody tr').forEach(applyRow);const password=prompt('이 학교의 편집 비밀번호를 입력하세요. 처음 저장할 때 설정됩니다.');if(!password)return;const r=await fetch('/api/project',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({office:school.officeCode,school:school.schoolCode,schoolName:school.schoolName,month,password,payload:{days:data}})}),j=await r.json();alert(r.ok?'저장되었습니다.':j.error)}
-function openFilter(){const m=$('#modal');m.classList.remove('hide');m.innerHTML=`<div class="modalcard"><h2>알레르기 필터</h2><div class="allergy">${Object.entries(A).map(([n,v])=>`<button data-a="${n}" class="${allergies.has(+n)?'on':''}"><b>${n}</b>${v}</button>`).join('')}</div><button id="toggle" class="${allergyOn?'danger':'ghost'}">${allergyOn?'필터 켜짐':'필터 꺼짐'}</button><button id="done" class="primary">완료</button></div>`;$$('[data-a]').forEach(b=>b.onclick=()=>{allergies.has(+b.dataset.a)?allergies.delete(+b.dataset.a):allergies.add(+b.dataset.a);b.classList.toggle('on')});$('#toggle').onclick=()=>{allergyOn=!allergyOn;$('#toggle').textContent=allergyOn?'필터 켜짐':'필터 꺼짐';$('#toggle').className=allergyOn?'danger':'ghost'};$('#done').onclick=()=>{localStorage.setItem('allergies',JSON.stringify([...allergies]));localStorage.setItem('allergyOn',allergyOn?'1':'0');m.classList.add('hide');renderTab()}}
+function openFilter(){const m=$('#modal');m.classList.remove('hide');m.innerHTML=`<div class="modalcard filtermodal"><button id="filterClose" class="modalclose">×</button><h2>알레르기 필터</h2><p class="filterhelp">피해야 하는 식품을 누르면 즉시 선택됩니다. 하나 이상 선택하면 필터가 자동으로 켜집니다.</p><div id="selectedCount" class="selectedcount"></div><div class="allergy">${Object.entries(A).map(([n,v])=>`<button type="button" data-a="${n}" class="${allergies.has(+n)?'on':''}"><b>${n}</b><span>${v}</span></button>`).join('')}</div><div class="filteractions"><button id="clearAll" class="ghost">전체 해제</button><button id="done" class="primary">적용하고 닫기</button></div></div>`;
+const refresh=()=>{allergyOn=allergies.size>0;const count=$('#selectedCount');if(count)count.textContent=allergies.size?`선택 ${allergies.size}개 · 필터 켜짐`:'선택 없음 · 필터 꺼짐'};
+refresh();
+$$('[data-a]').forEach(b=>b.onclick=()=>{const n=+b.dataset.a;allergies.has(n)?allergies.delete(n):allergies.add(n);b.classList.toggle('on');refresh()});
+$('#clearAll').onclick=()=>{allergies.clear();$$('[data-a]').forEach(b=>b.classList.remove('on'));refresh()};
+const closeAndApply=()=>{allergyOn=allergies.size>0;localStorage.setItem('allergies',JSON.stringify([...allergies]));localStorage.setItem('allergyOn',allergyOn?'1':'0');m.classList.add('hide');renderTab()};
+$('#done').onclick=closeAndApply;$('#filterClose').onclick=closeAndApply}
 function openSignage(){const m=$('#modal');m.classList.remove('hide');m.innerHTML=`<div class="modalcard"><h2>사이니지 형태 선택</h2><div class="devices">${[['tv','📺 TV 16:9'],['standby','🖥️ 스탠바이미'],['kiosk','📱 키오스크 9:16']].map(x=>`<button data-device="${x[0]}">${x[1]}</button>`).join('')}</div><div id="signTools"></div><button id="close" class="ghost">닫기</button></div>`;$$('[data-device]').forEach(b=>b.onclick=()=>showSignTools(b.dataset.device));$('#close').onclick=()=>m.classList.add('hide')}
 async function showSignTools(type){const url=`${location.origin}${location.pathname}?mode=signage&type=${type}&office=${school.officeCode}&school=${school.schoolCode}&name=${encodeURIComponent(school.schoolName)}&month=${month}`;$('#signTools').innerHTML=`<canvas id="qr"></canvas><input id="url" value="${esc(url)}" readonly><a href="${url}" target="_blank" class="primary link">전체화면 미리보기</a><button id="copy" class="ghost">URL 복사</button>`;await QRCode.toCanvas($('#qr'),url,{width:180});$('#copy').onclick=()=>navigator.clipboard.writeText(url)}
 async function bootSignage(){month=p.get('month')||month;document.body.className=`signage ${p.get('type')||'tv'}`;app.innerHTML=`<div class="public"><header><div class="logo">🥗</div><div><h1>${esc(school.schoolName)} 스마트 급식실</h1><p>건강한 선택으로 즐거운 점심시간을 만들어요!</p></div><button id="publicFilter" class="danger">🚨 알레르기 필터</button></header><nav><button data-public="day" class="active">오늘의 식단</button><button data-public="month">월간 식단</button></nav><main id="content"><div class="loading">식단을 불러오는 중입니다.</div></main><div id="modal" class="modal hide"></div></div>`;$('#publicFilter').onclick=openFilter;$$('[data-public]').forEach(b=>b.onclick=()=>{tab=b.dataset.public;$$('[data-public]').forEach(x=>x.classList.toggle('active',x===b));renderTab()});await loadApi()}
