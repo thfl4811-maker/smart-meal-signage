@@ -353,7 +353,7 @@ function editRow(d,k,i){const cur=i.type||'normal';
 const btn=(t,emo,title)=>`<button data-type-btn="${t}" data-d="${d}" data-k="${k}" title="${esc(title)}" class="w-9 h-9 rounded-lg border-2 text-sm transition-all ${cur===t?'border-gray-800 bg-white shadow':'border-gray-200 bg-gray-50 opacity-40 hover:opacity-80'}">${emo}</button>`;
 return `<div class="flex flex-wrap items-center gap-1.5">
 <span class="flex flex-col text-[10px] leading-none"><button data-up="${d}|${k}" class="text-gray-300 hover:text-gray-600 px-1">▲</button><button data-down="${d}|${k}" class="text-gray-300 hover:text-gray-600 px-1">▼</button></span>
-<input class="ename flex-1 min-w-36 border-2 border-gray-200 rounded-lg px-2.5 py-2 text-sm font-bold ${TYPES[cur].cls}" data-d="${d}" data-k="${k}" value="${esc(i.name)}">
+<input class="ename flex-1 min-w-36 border-2 border-gray-200 rounded-lg px-2.5 py-2 text-sm font-bold ${TYPES[cur].cls}" data-d="${d}" data-k="${k}" value="${esc(cleanMode?cleanName(i.name):i.name)}">
 <input class="ealg w-24 border-2 border-gray-200 rounded-lg px-2 py-2 text-xs" data-d="${d}" data-k="${k}" placeholder="알레르기" value="${i.allergy.join(',')}">
 ${btn('normal','⬜','일반')}${btn('selfGreen','🟢',legend.green)}${btn('selfBlue','🔵',legend.blue)}${btn('choice','🟠',legend.orange)}
 <button data-del="${d}|${k}" class="w-9 h-9 rounded-lg bg-red-50 text-red-500 border-2 border-red-100 text-sm font-black hover:bg-red-100">✕</button>
@@ -363,6 +363,7 @@ $('#content').innerHTML=`<section class="bg-white border border-gray-200 rounded
 <div class="flex flex-wrap items-center justify-between gap-2 mb-1"><h2 class="text-xl font-black">식단 편집</h2>
 <div class="flex gap-2 flex-wrap"><button id="legendBtn2" class="bg-violet-50 hover:bg-violet-100 text-violet-700 rounded-xl px-4 py-2.5 text-sm font-black border-2 border-violet-200">🎨 범례 설정</button><button id="replace" class="bg-gray-100 hover:bg-gray-200 rounded-xl px-4 py-2.5 text-sm font-black">찾아 바꾸기</button><button id="saveAll" class="bg-brand-500 hover:bg-brand-600 text-white rounded-xl px-4 py-2.5 text-sm font-black">전체 저장</button></div></div>
 <p class="text-xs text-gray-400 font-bold mb-4">수정하면 즉시 반영돼요. 색 버튼: 🟢 ${esc(legend.green)} · 🔵 ${esc(legend.blue)} · 🟠 ${esc(legend.orange)} — 마지막에 전체 저장을 눌러주세요.</p>
+
 <div class="space-y-2">
 ${dates.map(d=>{const x=data[d],dt=new Date(d+'T00:00:00');return `
 <details data-day="${d}" ${editOpen.has(d)?'open':''} class="border-2 border-gray-100 rounded-2xl overflow-hidden">
