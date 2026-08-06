@@ -29,7 +29,7 @@ const BAR={rice:'bg-sky-500',soup:'bg-amber-400',main:'bg-emerald-500',side:'bg-
 
 /* 메뉴명 자동 정리: (고)(석)(고,떡) 등 한글자 별칭 괄호 + 끝의 '중' 제거 */
 let cleanMode=localStorage.getItem('cleanMode')!=='0';
-function cleanName(n){let s=n.replace(/\((?:[가-힣](?:,[가-힣])*)\)/g,'').replace(/\*+/g,'').replace(/@/g,'').trim();if(s.length>2&&/중$/.test(s))s=s.slice(0,-1);return s.replace(/\s{2,}/g,' ').trim()||n}
+function cleanName(n){let s=n.replace(/\((?:\s*(?:[가-힣]|자율|선택)\s*(?:,\s*(?:[가-힣]|자율|선택)\s*)*)\)/g,'').replace(/\[선택\]/g,'').replace(/\*+/g,'').replace(/@/g,'').trim();if(s.length>2&&/중$/.test(s))s=s.slice(0,-1);return s.replace(/\s{2,}/g,' ').trim()||n}
 function disp(n){return (cleanMode||signage||student)?cleanName(n):n}
 const TYPES={normal:{label:'',cls:'',chip:''},selfGreen:{label:'자율',cls:'text-emerald-700',chip:'bg-emerald-100 text-emerald-800 border-emerald-300'},selfBlue:{label:'자율',cls:'text-sky-700',chip:'bg-sky-100 text-sky-800 border-sky-300'},choice:{label:'선택',cls:'text-orange-600',chip:'bg-orange-100 text-orange-800 border-orange-300'}};
 let legend=Object.assign({green:'자율 야채쌈/샐러드 🌿',blue:'자율 반찬 메뉴 🔵',orange:'선택 메뉴 🗳️',notice:'자율 배식대를 통해 밥·국·김치는 자유롭게 추가 이용 가능해요!'},JSON.parse(localStorage.getItem('mealLegend')||'{}'));
@@ -135,7 +135,7 @@ function bind(){
   if($('#compareExcel'))$('#compareExcel').onchange=compareWithExcel;
   if($('#legendBtn'))$('#legendBtn').onclick=openLegend;
   $$('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;renderHome();});
-  if(school&&source==='api')loadApi()}
+  if(school){if(Object.keys(data).length)renderTab();else if(source==='api')loadApi()}}
 
 async function findSchools(){const q=$('#q').value.trim();if(q.length<2)return alert('두 글자 이상 입력하세요.');$('#results').innerHTML='<p class="text-gray-400 text-sm">검색 중…</p>';const r=await fetch('/api/schools?q='+encodeURIComponent(q)),j=await r.json();
 $('#results').innerHTML=j.map((s,i)=>`<button class="school w-full bg-white border-2 border-gray-200 hover:border-brand-300 rounded-2xl p-4 text-left card-hover" data-i="${i}"><b class="block">${esc(s.schoolName)}</b><span class="text-gray-400 text-xs font-bold">${esc(s.officeName)} · ${esc(s.address)}</span></button>`).join('');
