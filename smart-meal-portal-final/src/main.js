@@ -56,6 +56,7 @@ ${[['green','bg-emerald-500'],['blue','bg-sky-500'],['orange','bg-orange-500']].
 $('#lgCancel').onclick=()=>{m.classList.add('hidden');m.classList.remove('flex')};
 $('#lgSave').onclick=()=>{legend={green:$('#lg-green').value,blue:$('#lg-blue').value,orange:$('#lg-orange').value,notice:$('#lg-notice').value};localStorage.setItem('mealLegend',JSON.stringify(legend));m.classList.add('hidden');m.classList.remove('flex');renderTab()}}
 function normalizeTypes(){Object.values(data).forEach(d=>d.items.forEach(i=>{if(i.type==='self')i.type='selfGreen';else if(i.type==='choiceA'||i.type==='choiceB')i.type='choice';if(!i.type)i.type='normal'}))}
+function localDate(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 const p=new URLSearchParams(location.search);
 let school=JSON.parse(localStorage.getItem('meal_school')||'null'),month=p.get('month')||new Date().toISOString().slice(0,7),data={},date='',tab='day',allergies=new Set(JSON.parse(localStorage.getItem('allergies')||'[]')),allergyOn=localStorage.getItem('allergyOn')==='1',source='api';
 const signage=p.get('mode')==='signage',student=p.get('mode')==='student';
@@ -145,7 +146,7 @@ async function loadApi(){try{$('#content').innerHTML='<div class="bg-white round
 function parseRows(rows){const out={};rows.filter(r=>r.mealCode==='2').forEach(r=>{const d=`${r.date.slice(0,4)}-${r.date.slice(4,6)}-${r.date.slice(6,8)}`;const items=r.dishes.split('<br/>').map(parseDish).filter(Boolean);const nutrient={};String(r.nutrients||'').split(/<br\s*\/?>/i).forEach(x=>{const m=x.match(/^(.+?)(?:\(([^)]+)\))?\s*:\s*([\d.,]+)\s*(.*)$/);if(m)nutrient[m[1].trim()]={value:m[3],unit:(m[2]||m[4]||'').trim()}});out[d]={date:d,items,calories:r.calories,nutrient,origin:r.origin||'',note:'',edited:false}});return out}
 function parseDish(t){t=t.replace(/<[^>]+>/g,'').trim();if(!t)return null;const al=[];for(const m of t.matchAll(/\(([\d.]+)\)/g))m[1].split('.').map(Number).forEach(n=>n>=1&&n<=19&&al.push(n));let name=t.replace(/\(([\d.]+)\)/g,'').trim();let type='normal';if(/자율/.test(name))type='selfGreen';else if(/\[선택\]/.test(name))type='choice';return{name,allergy:[...new Set(al)],type,category:'',order:0}}
 async function applySaved(){try{const r=await fetch(`/api/project?office=${school.officeCode}&school=${school.schoolCode}&month=${month}`),j=await r.json();if(j?.payload?.days)data=j.payload.days;if(j?.payload?.legend){legend=j.payload.legend;localStorage.setItem('mealLegend',JSON.stringify(legend))}}catch{}}
-function setDefaultDate(){const today=new Date().toISOString().slice(0,10);date=data[today]?today:Object.keys(data).sort()[0]||''}
+function setDefaultDate(){const today=localDate(new Date());date=data[today]?today:Object.keys(data).sort()[0]||''}
 
 function parseExcelBook(book){
 const ws=book.Sheets[book.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
@@ -285,7 +286,7 @@ $('#today').onclick=()=>{const t=new Date().toISOString().slice(0,10);if(data[t]
 
 /* ═══════ 주간 ═══════ */
 function renderWeek(){if(!date)setDefaultDate();const base=new Date(date+'T00:00:00');const mon=new Date(base);mon.setDate(base.getDate()-((base.getDay()+6)%7));
-const days=[...Array(5)].map((_,i)=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return d.toISOString().slice(0,10)});
+const days=[...Array(5)].map((_,i)=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return localDate(d)});
 $('#content').innerHTML=`
 <div class="flex items-center justify-between mb-4">
   <h2 class="text-xl font-black">🗓️ 주간 식단 (${days[0].slice(5)} ~ ${days[4].slice(5)})</h2>
@@ -309,7 +310,7 @@ ${legendBar()}${filterBanner()}
 $('#wprev').onclick=()=>{const d=new Date(date+'T00:00:00');d.setDate(d.getDate()-7);date=nearest(d);renderWeek()};
 $('#wnext').onclick=()=>{const d=new Date(date+'T00:00:00');d.setDate(d.getDate()+7);date=nearest(d);renderWeek()};
 $$('.card-hover[data-date]').forEach(c=>c.onclick=()=>{date=c.dataset.date;tab='day';renderHome()});}
-function nearest(d){const t=d.toISOString().slice(0,10);if(data[t])return t;const ds=Object.keys(data).sort();return ds.find(x=>x>=t)||ds[ds.length-1]||t}
+function nearest(d){const t=localDate(d);if(data[t])return t;const ds=Object.keys(data).sort();return ds.find(x=>x>=t)||ds[ds.length-1]||t}
 
 /* ═══════ 월간 (왼쪽 알레르기 패널) ═══════ */
 function renderMonth(){const cards=Object.keys(data).sort().map(d=>{const x=data[d],dt=new Date(d+'T00:00:00');const dayHit=allergyOn&&x.items.some(i=>i.allergy.some(n=>allergies.has(n)));
@@ -387,7 +388,8 @@ $$('[data-add]').forEach(b=>b.onclick=()=>{data[b.dataset.add].items.push({name:
 $$('[data-note]').forEach(el=>el.onchange=()=>{data[el.dataset.note].note=el.value;data[el.dataset.note].edited=true});
 $('#legendBtn2').onclick=openLegend;$('#replace').onclick=replaceAll;$('#saveAll').onclick=saveProject}
 function replaceAll(){const a=prompt('찾을 내용'),b=a!==null?prompt('바꿀 내용',''):null;if(a===null||b===null)return;Object.values(data).forEach(d=>d.items.forEach(i=>{i.name=i.name.split(a).join(b)}));renderEdit()}
-async function saveProject(){const password=prompt('이 학교의 편집 비밀번호를 입력하세요. 처음 저장할 때 설정됩니다.');if(!password)return;const r=await fetch('/api/project',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({office:school.officeCode,school:school.schoolCode,schoolName:school.schoolName,month,password,payload:{days:data,legend}})}),j=await r.json();alert(r.ok?'저장되었습니다.':j.error)}
+async function saveProject(){if(cleanMode){Object.values(data).forEach(d=>{d.items.forEach(i=>{i.name=cleanName(i.name)});d.edited=true})}
+const password=prompt('이 학교의 편집 비밀번호를 입력하세요. 처음 저장할 때 설정됩니다.');if(!password)return;const r=await fetch('/api/project',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({office:school.officeCode,school:school.schoolCode,schoolName:school.schoolName,month,password,payload:{days:data,legend}})}),j=await r.json();alert(r.ok?'저장되었습니다.':j.error)}
 
 /* ═══════ 알레르기 모달 (기존 유지) ═══════ */
 function openFilter(){const m=$('#modal');m.classList.remove('hidden');m.classList.add('flex');
