@@ -1,0 +1,9 @@
+body{font-family:'Noto Sans KR',sans-serif}
+.scrollbar-hide{scrollbar-width:none}
+.scrollbar-hide::-webkit-scrollbar{display:none}
+.card-hover{transition:all .15s}
+.card-hover:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.10)}
+.signage-tv #app{max-width:100vw}
+.signage-kiosk .pub-wrap{max-width:640px}
+.signage-standby .pub-wrap{max-width:900px}
+@media print{.no-print{display:none}}
