@@ -27,6 +27,10 @@ const PORTION={
 };
 const BAR={rice:'bg-sky-500',soup:'bg-amber-400',main:'bg-emerald-500',side:'bg-teal-400',kimchi:'bg-orange-500',dessert:'bg-rose-500'};
 
+/* 메뉴명 자동 정리: (고)(석)(고,떡) 등 한글자 별칭 괄호 + 끝의 '중' 제거 */
+let cleanMode=localStorage.getItem('cleanMode')!=='0';
+function cleanName(n){let s=n.replace(/\((?:[가-힣](?:,[가-힣])*)\)/g,'').replace(/\*+/g,'').replace(/@/g,'').trim();if(s.length>2&&/중$/.test(s))s=s.slice(0,-1);return s.replace(/\s{2,}/g,' ').trim()||n}
+function disp(n){return (cleanMode||signage||student)?cleanName(n):n}
 const p=new URLSearchParams(location.search);
 let school=JSON.parse(localStorage.getItem('meal_school')||'null'),month=p.get('month')||new Date().toISOString().slice(0,7),data={},date='',tab='day',allergies=new Set(JSON.parse(localStorage.getItem('allergies')||'[]')),allergyOn=localStorage.getItem('allergyOn')==='1',source='api';
 const signage=p.get('mode')==='signage',student=p.get('mode')==='student';
@@ -43,7 +47,7 @@ function renderHome(){app.innerHTML=`
         <h1 class="text-xl md:text-2xl font-black text-gray-800 flex items-center gap-2 flex-wrap">스마트 월간식단 뷰어
           <span class="text-xs bg-brand-500 text-white px-3 py-1 rounded-full font-bold">${school?esc(schoolLevel())+' 배식 가이드':'식단 사이니지 2.0'}</span>
         </h1>
-        <p class="text-xs md:text-sm text-gray-400 font-bold">API 또는 엑셀로 불러오고 수정본을 사이니지·학생 화면에 표시합니다.</p>
+        <p class="text-xs md:text-sm text-gray-400 font-bold">개발자: 영양교사 김소리 · 수정본을 사이니지·학생 화면에 표시합니다.</p>
       </div>
     </div>
     ${school?`<button id="change" class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold px-4 py-2.5 rounded-xl border-2 border-gray-200 transition-all">학교 변경</button>`:''}
@@ -52,23 +56,24 @@ function renderHome(){app.innerHTML=`
   <div id="modal" class="fixed inset-0 bg-slate-900/70 z-50 hidden items-center justify-center p-5"></div>
 </div>`;bind()}
 
-function landing(){return `
-<section class="max-w-2xl mx-auto mt-16 text-center">
-  <h2 class="text-2xl font-black mb-6">식단 불러오기</h2>
-  <div class="grid md:grid-cols-2 gap-4">
-    <button id="apiMode" class="bg-white border-2 border-gray-200 hover:border-brand-300 rounded-3xl p-8 card-hover text-left">
-      <span class="text-3xl block mb-3">🔎</span><b class="block text-lg">나이스 API</b><span class="text-gray-400 text-sm font-bold">학교 검색으로 자동 불러오기</span>
-    </button>
-    <label class="bg-white border-2 border-gray-200 hover:border-brand-300 rounded-3xl p-8 card-hover text-left cursor-pointer">
-      <span class="text-3xl block mb-3">📄</span><b class="block text-lg">월간식단 엑셀 업로드</b><span class="text-gray-400 text-sm font-bold">학교 파일을 직접 분석</span>
-      <input id="excel" type="file" accept=".xlsx,.xls" class="hidden">
-    </label>
-  </div>
-  <div class="flex mt-5 bg-white border-2 border-gray-200 rounded-2xl p-2 shadow-sm">
-    <input id="q" placeholder="학교명 입력" class="flex-1 border-0 outline-none px-4 text-sm">
-    <button id="find" class="bg-brand-600 hover:bg-brand-700 text-white font-black rounded-xl px-6 py-3 text-sm transition-all">학교 검색</button>
+function landing(){const last=JSON.parse(localStorage.getItem('meal_school_last')||'null');return `
+<section class="max-w-xl mx-auto mt-16 text-center">
+  <div class="w-16 h-16 rounded-2xl bg-brand-50 flex items-center justify-center mx-auto mb-4 text-4xl border border-brand-100 shadow-inner">🥗</div>
+  <h2 class="text-3xl font-black mb-1">스마트 월간식단 뷰어</h2>
+  <p class="text-sm text-brand-700 font-black mb-8">개발자: 영양교사 김소리</p>
+  <div class="flex bg-white border-2 border-gray-200 rounded-2xl p-2 shadow-md">
+    <input id="q" placeholder="학교명을 입력하세요" class="flex-1 border-0 outline-none px-4 text-base font-bold">
+    <button id="find" class="bg-brand-600 hover:bg-brand-700 text-white font-black rounded-xl px-6 py-3.5 text-sm transition-all">학교 검색</button>
   </div>
   <div id="results" class="mt-3 space-y-2 text-left"></div>
+  ${last?`<button id="lastSchool" class="mt-4 w-full bg-brand-50 border-2 border-brand-200 hover:bg-brand-100 rounded-2xl p-4 text-left card-hover transition-all">
+    <span class="text-xs font-black text-brand-600 block mb-0.5">최근 사용한 학교 바로가기</span>
+    <b class="text-base font-black">${esc(last.schoolName)} →</b>
+  </button>`:''}
+  <label class="inline-block mt-8 text-xs text-gray-400 font-bold cursor-pointer hover:text-gray-600 transition-all">
+    📄 월간식단 엑셀 파일로 직접 불러오기
+    <input id="excel" type="file" accept=".xlsx,.xls" class="hidden">
+  </label>
 </section>`}
 
 function workspace(){return `
@@ -81,6 +86,8 @@ function workspace(){return `
   <button id="reload" class="bg-brand-500 hover:bg-brand-600 text-white font-black px-4 py-2.5 rounded-xl text-sm transition-all">식단 불러오기</button>
   <button id="filter" class="bg-red-50 hover:bg-red-100 text-red-700 font-black px-4 py-2.5 rounded-xl text-sm border-2 border-red-200 transition-all">🚨 알레르기</button>
   <button id="signage" class="bg-gray-800 hover:bg-gray-900 text-white font-black px-4 py-2.5 rounded-xl text-sm transition-all">📺 사이니지·공유</button>
+  <button id="cleanToggle" class="font-black px-4 py-2.5 rounded-xl text-sm border-2 transition-all ${cleanMode?'bg-brand-50 border-brand-300 text-brand-700':'bg-gray-50 border-gray-200 text-gray-400'}">✨ 메뉴명 자동 정리 ${cleanMode?'ON':'OFF'}</button>
+  <label class="bg-sky-50 hover:bg-sky-100 text-sky-700 font-black px-4 py-2.5 rounded-xl text-sm border-2 border-sky-200 transition-all cursor-pointer">📋 월간식단표와 검토<input id="compareExcel" type="file" accept=".xlsx,.xls" class="hidden"></label>
 </section>
 <nav class="flex gap-2 mt-4 bg-white border border-gray-200 rounded-2xl p-2 shadow-sm">
   ${[['day','fa-calendar-day','일간'],['week','fa-calendar-week','주간'],['month','fa-calendar-days','월간'],['edit','fa-pen-to-square','월 전체 편집'],['detail','fa-file-pen','상세 편집']].map(x=>`
@@ -91,24 +98,67 @@ function workspace(){return `
 function bind(){
   if($('#change'))$('#change').onclick=()=>{localStorage.removeItem('meal_school');school=null;data={};renderHome()};
   if($('#find')){$('#find').onclick=findSchools;$('#q').onkeydown=e=>e.key==='Enter'&&findSchools()}
+  if($('#lastSchool'))$('#lastSchool').onclick=()=>{school=JSON.parse(localStorage.getItem('meal_school_last'));source='api';localStorage.setItem('meal_school',JSON.stringify(school));renderHome()};
   if($('#excel'))$('#excel').onchange=loadExcel;
   if($('#reload'))$('#reload').onclick=loadApi;
   if($('#month'))$('#month').onchange=e=>{month=e.target.value;loadApi()};
   if($('#filter'))$('#filter').onclick=openFilter;
   if($('#signage'))$('#signage').onclick=openSignage;
+  if($('#cleanToggle'))$('#cleanToggle').onclick=()=>{cleanMode=!cleanMode;localStorage.setItem('cleanMode',cleanMode?'1':'0');renderHome()};
+  if($('#compareExcel'))$('#compareExcel').onchange=compareWithExcel;
   $$('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;renderHome();});
   if(school&&source==='api')loadApi()}
 
 async function findSchools(){const q=$('#q').value.trim();if(q.length<2)return alert('두 글자 이상 입력하세요.');$('#results').innerHTML='<p class="text-gray-400 text-sm">검색 중…</p>';const r=await fetch('/api/schools?q='+encodeURIComponent(q)),j=await r.json();
 $('#results').innerHTML=j.map((s,i)=>`<button class="school w-full bg-white border-2 border-gray-200 hover:border-brand-300 rounded-2xl p-4 text-left card-hover" data-i="${i}"><b class="block">${esc(s.schoolName)}</b><span class="text-gray-400 text-xs font-bold">${esc(s.officeName)} · ${esc(s.address)}</span></button>`).join('');
-$$('.school').forEach(b=>b.onclick=()=>{school=j[+b.dataset.i];source='api';localStorage.setItem('meal_school',JSON.stringify(school));renderHome()})}
+$$('.school').forEach(b=>b.onclick=()=>{school=j[+b.dataset.i];source='api';localStorage.setItem('meal_school',JSON.stringify(school));localStorage.setItem('meal_school_last',JSON.stringify(school));renderHome()})}
 
 async function loadApi(){try{$('#content').innerHTML='<div class="bg-white rounded-3xl p-16 text-center text-gray-400">나이스 식단을 불러오는 중입니다.</div>';const r=await fetch(`/api/meals?office=${school.officeCode}&school=${school.schoolCode}&month=${month.replace('-','')}`),rows=await r.json();if(!r.ok)throw Error(rows.error);data=parseRows(rows);await applySaved();setDefaultDate();renderTab()}catch(e){$('#content').innerHTML=`<div class="bg-white rounded-3xl p-16 text-center text-gray-400">${esc(e.message)}</div>`}}
-function parseRows(rows){const out={};rows.filter(r=>r.mealCode==='2').forEach(r=>{const d=`${r.date.slice(0,4)}-${r.date.slice(4,6)}-${r.date.slice(6,8)}`;const items=r.dishes.split('<br/>').map(parseDish).filter(Boolean);const nutrient={};r.nutrients.split('<br/>').forEach(x=>{const m=x.match(/^(.+?)\s*:\s*([\d.]+)\s*(.*)$/);if(m)nutrient[m[1].trim()]={value:m[2],unit:m[3]}});out[d]={date:d,items,calories:r.calories,nutrient,note:'',edited:false}});return out}
+function parseRows(rows){const out={};rows.filter(r=>r.mealCode==='2').forEach(r=>{const d=`${r.date.slice(0,4)}-${r.date.slice(4,6)}-${r.date.slice(6,8)}`;const items=r.dishes.split('<br/>').map(parseDish).filter(Boolean);const nutrient={};String(r.nutrients||'').split(/<br\s*\/?>/i).forEach(x=>{const m=x.match(/^(.+?)(?:\(([^)]+)\))?\s*:\s*([\d.,]+)\s*(.*)$/);if(m)nutrient[m[1].trim()]={value:m[3],unit:(m[2]||m[4]||'').trim()}});out[d]={date:d,items,calories:r.calories,nutrient,origin:r.origin||'',note:'',edited:false}});return out}
 function parseDish(t){t=t.replace(/<[^>]+>/g,'').trim();if(!t)return null;const al=[];for(const m of t.matchAll(/\(([\d.]+)\)/g))m[1].split('.').map(Number).forEach(n=>n>=1&&n<=19&&al.push(n));let name=t.replace(/\(([\d.]+)\)/g,'').trim(),type=/자율/.test(name)?'self':'normal';return{name,allergy:[...new Set(al)],type,category:'',order:0}}
 async function applySaved(){try{const r=await fetch(`/api/project?office=${school.officeCode}&school=${school.schoolCode}&month=${month}`),j=await r.json();if(j?.payload?.days)data=j.payload.days}catch{}}
 function setDefaultDate(){const today=new Date().toISOString().slice(0,10);date=data[today]?today:Object.keys(data).sort()[0]||''}
 
+function parseExcelBook(book){
+const ws=book.Sheets[book.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
+let year='',mon='';
+for(const row of rows){for(const cell of row){const t=String(cell||'').trim();const ym=t.match(/조회년월\s*:\s*(\d{4})년\s*(\d{1,2})월/);if(ym){year=ym[1];mon=String(ym[2]).padStart(2,'0')}}}
+if(!year||!mon)throw Error('엑셀에서 조회 연월을 찾지 못했습니다.');
+const parsed={};
+const parseCell=(cell,dateKey)=>{const raw=String(cell||'').replace(/\r/g,'').trim();if(!raw||raw==='0')return null;
+const lines=raw.split('\n').map(x=>x.trim()).filter(Boolean);const ei=lines.findIndex(x=>/^\*\s*에너지/.test(x));
+let menu=ei>=0?lines.slice(0,ei):lines.slice();menu=menu.filter(x=>x!=='[식단]'&&x!=='중식'&&x!=='0');
+const items=menu.map(parseDish).filter(Boolean);if(!items.length)return null;
+return{date:dateKey,items};};
+for(let r=0;r<rows.length-1;r++){const dr=rows[r]||[],mr=rows[r+1]||[];const nd=[];
+for(let cc=0;cc<dr.length;cc++){const v=String(dr[cc]??'').trim().replace(/\.0$/,'');if(/^\d{1,2}$/.test(v)){const day=+v;if(day>=1&&day<=31)nd.push({c:cc,day})}}
+if(!nd.length)continue;
+const looks=mr.some(cell=>{const t=String(cell||'');return /\n/.test(t)||/중식/.test(t)});
+if(!looks)continue;
+for(const{c:cc,day}of nd){const k=`${year}-${mon}-${String(day).padStart(2,'0')}`;const m=parseCell(mr[cc],k);if(m)parsed[k]=m}}
+return{parsed,year,mon}}
+async function compareWithExcel(e){const f=e.target.files[0];if(!f)return;
+try{const{parsed,year,mon}=parseExcelBook(XLSX.read(await f.arrayBuffer(),{type:'array'}));
+const norm=n=>cleanName(n).replace(/\s/g,'');
+const dates=[...new Set([...Object.keys(data),...Object.keys(parsed)])].sort();
+let diffCount=0;
+const rowsHtml=dates.map(d=>{const a=data[d]?.items||[],b=parsed[d]?.items||[];
+const an=a.map(i=>norm(i.name)),bn=b.map(i=>norm(i.name));
+const onlyApi=a.filter(i=>!bn.includes(norm(i.name))),onlyXl=b.filter(i=>!an.includes(norm(i.name)));
+const same=!onlyApi.length&&!onlyXl.length&&(a.length||b.length);
+if(!a.length&&!b.length)return '';
+if(!same)diffCount++;
+return `<tr class="border-b border-gray-100 ${same?'':'bg-red-50/50'}">
+<td class="p-2.5 text-xs font-black whitespace-nowrap align-top">${d.slice(5)} ${same?'<span class=\"text-brand-600\">일치</span>':'<span class=\"text-red-600\">차이</span>'}</td>
+<td class="p-2.5 text-xs align-top">${a.map(i=>{const miss=!bn.includes(norm(i.name));return `<div class=\"my-0.5 font-bold ${miss?'text-red-700 bg-red-100 rounded px-1.5':''}\">${esc(disp(i.name))}${miss?' ⚠️':''}</div>`}).join('')||'<span class=\"text-gray-300\">없음</span>'}</td>
+<td class="p-2.5 text-xs align-top">${b.map(i=>{const miss=!an.includes(norm(i.name));return `<div class=\"my-0.5 font-bold ${miss?'text-sky-700 bg-sky-100 rounded px-1.5':''}\">${esc(disp(i.name))}${miss?' ⚠️':''}</div>`}).join('')||'<span class=\"text-gray-300\">없음</span>'}</td></tr>`}).join('');
+$('#content').innerHTML=`<section class="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm">
+<div class="flex flex-wrap items-center justify-between gap-2 mb-1"><h2 class="text-xl font-black">📋 월간식단표 검토 (${year}년 ${+mon}월)</h2>
+<span class="text-sm font-black ${diffCount?'text-red-600':'text-brand-600'}">${diffCount?`차이 있는 날 ${diffCount}일`:'모든 날짜 일치 ✅'}</span></div>
+<p class="text-xs text-gray-400 font-bold mb-4">별칭·특수문자를 제거한 정리된 이름 기준으로 비교합니다. ⚠️ = 반대쪽에 없는 메뉴</p>
+<div class="overflow-auto"><table class="w-full min-w-[700px] border-collapse"><thead><tr class="border-b-2 border-gray-200 text-left text-xs font-black text-gray-400"><th class="p-2.5 w-24">날짜</th><th class="p-2.5">🔎 나이스 API 식단</th><th class="p-2.5">📄 업로드한 월간식단표</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
+<button onclick="location.reload()" class="mt-4 bg-gray-100 hover:bg-gray-200 rounded-xl px-4 py-2.5 text-sm font-black">검토 종료</button></section>`;
+}catch(err){alert('검토 실패: '+err.message)}e.target.value=''}
 async function loadExcel(e){const f=e.target.files[0];if(!f)return;
 try{const book=XLSX.read(await f.arrayBuffer(),{type:'array'});const ws=book.Sheets[book.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
 let year='',mon='',schoolName='';
@@ -145,7 +195,7 @@ return `<article class="bg-white border-2 ${hit?'border-red-400 bg-red-50/40':'b
   <div class="flex items-center gap-3 mt-4 mb-1">
     <span class="text-4xl">${emo}</span>
     <div>
-      <h3 class="font-black text-lg leading-tight">${esc(i.name)}</h3>
+      <h3 class="font-black text-lg leading-tight">${esc(disp(i.name))}</h3>
       ${i.allergy.length?`<span class="text-[11px] font-black text-red-500 bg-red-50 border border-red-100 px-2 py-0.5 rounded-full">알레르기: ${i.allergy.join(',')}</span>`:'<span class="text-[11px] font-bold text-gray-300 bg-gray-50 px-2 py-0.5 rounded-full">안심 메뉴</span>'}
     </div>
   </div>
@@ -182,15 +232,19 @@ ${filterBanner()}
   <div class="lg:col-span-8"><div class="grid md:grid-cols-2 xl:grid-cols-3 gap-4">${stepCards(x)}</div>
     <div class="mt-5 bg-white border border-gray-200 rounded-3xl p-5 flex flex-wrap justify-around items-center gap-4 text-center shadow-sm">
       <div><span class="text-xs text-gray-400 block font-black">🔥 에너지</span><span class="text-2xl font-black text-sky-600">${esc(x.calories||'-')}</span></div>
-      ${['단백질','칼슘','철분'].map((k,i)=>`<div class="hidden md:block w-px h-10 bg-gray-200"></div><div><span class="text-xs text-gray-400 block font-black">${['🥩','🥛','🔩'][i]} ${k}</span><span class="text-2xl font-black text-gray-700">${x.nutrient[k]?x.nutrient[k].value+' '+x.nutrient[k].unit:'-'}</span></div>`).join('')}
+      ${['탄수화물','단백질','지방','칼슘','철분'].map((k,i)=>{const v=x.nutrient[k];if(!v)return'';return `<div class="hidden md:block w-px h-10 bg-gray-200"></div><div><span class="text-xs text-gray-400 block font-black">${['🍞','🥩','🥑','🥛','🔩'][i]} ${k}</span><span class="text-2xl font-black text-gray-700">${v.value}<small class="text-sm">${esc(v.unit)}</small></span></div>`}).join('')}
     </div>
+    ${x.origin?`<div class="mt-4 bg-white border border-gray-200 rounded-3xl p-5 shadow-sm">
+      <h3 class="font-black text-sm mb-3 flex items-center gap-2">🌾 원산지 정보</h3>
+      <div class="flex flex-wrap gap-1.5">${x.origin.split(/<br\s*\/?>/i).filter(Boolean).map(o=>`<span class="text-[11px] font-bold bg-slate-50 border border-gray-200 text-gray-500 rounded-full px-2.5 py-1">${esc(o.trim())}</span>`).join('')}</div>
+    </div>`:''}
   </div>
   <aside class="lg:col-span-4 space-y-4">
     <div class="bg-white border border-gray-200 rounded-3xl p-5 shadow-sm">
       <h3 class="font-black text-base mb-1 flex items-center gap-2"><i class="fa-solid fa-list-check text-brand-600"></i> 오늘 급식 전체 리스트</h3>
       <p class="text-xs text-gray-400 font-bold mb-4">알레르기 유무를 큰 글씨로 점검하세요.</p>
       <ul class="space-y-2.5">${x.items.map(i=>{const hit=allergyOn&&i.allergy.some(a=>allergies.has(a));
-        return `<li class="flex items-center gap-2 text-sm font-bold ${hit?'bg-red-50 border border-red-100 rounded-xl px-3 py-2 text-red-800':''}">${icon(i.name)} ${esc(i.name)}${i.allergy.length?`<small class="text-red-500 font-black">${i.allergy.join('·')}</small>`:''}${hit?'<b class="ml-auto bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full">주의</b>':''}</li>`}).join('')}</ul>
+        return `<li class="flex items-center gap-2 text-sm font-bold ${hit?'bg-red-50 border border-red-100 rounded-xl px-3 py-2 text-red-800':''}">${icon(i.name)} ${esc(disp(i.name))}${i.allergy.length?`<small class="text-red-500 font-black">${i.allergy.join('·')}</small>`:''}${hit?'<b class="ml-auto bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full">주의</b>':''}</li>`}).join('')}</ul>
     </div>
     <div class="bg-slate-50 border border-gray-100 rounded-3xl p-5">
       <h3 class="font-black text-base mb-4 flex items-center gap-1.5"><span class="text-xl">💡</span> AI 영양교사의 오늘 식단 팁</h3>
@@ -220,7 +274,7 @@ ${filterBanner()}
       <b class="text-sm font-black">${dt.getMonth()+1}/${dt.getDate()} ${'일월화수목금토'[dt.getDay()]}</b>
       ${dayHit?'<span class="text-[10px] bg-red-100 text-red-700 font-black px-2 py-0.5 rounded-full">주의</span>':''}
     </div>
-    ${x?x.items.map(i=>{const hit=allergyOn&&i.allergy.some(n=>allergies.has(n));return `<div class="text-xs font-bold my-1.5 leading-snug ${hit?'bg-red-50 rounded-lg px-2 py-1 text-red-800':''}">${icon(i.name)} ${esc(i.name)}</div>`}).join('')+`<footer class="border-t border-dashed mt-2 pt-2 text-[11px] text-gray-400 font-bold">${esc(x.calories||'')}</footer>`
+    ${x?x.items.map(i=>{const hit=allergyOn&&i.allergy.some(n=>allergies.has(n));return `<div class="text-xs font-bold my-1.5 leading-snug ${hit?'bg-red-50 rounded-lg px-2 py-1 text-red-800':''}">${icon(i.name)} ${esc(disp(i.name))}</div>`}).join('')+`<footer class="border-t border-dashed mt-2 pt-2 text-[11px] text-gray-400 font-bold">${esc(x.calories||'')}</footer>`
     :'<p class="text-xs text-gray-300 text-center mt-10 font-bold">급식 없음</p>'}
   </article>`}).join('')}
 </div>`;
@@ -236,7 +290,7 @@ return `<article class="bg-white border-2 ${dayHit?'border-red-400 shadow-red-10
     <b class="text-sm font-black">${dt.getMonth()+1}월 ${dt.getDate()}일 ${'일월화수목금토'[dt.getDay()]}요일</b>
     <div class="flex gap-1">${dayHit?'<span class="text-[10px] bg-red-100 text-red-700 font-black px-2 py-0.5 rounded-full">알레르기 주의</span>':''}${x.edited?'<span class="text-[10px] bg-brand-50 text-brand-700 font-black px-2 py-0.5 rounded-full">수정됨</span>':''}</div>
   </div>
-  ${x.items.map(i=>{const hit=allergyOn&&i.allergy.some(n=>allergies.has(n));return `<div class="text-xs font-bold my-1.5 leading-snug flex items-center gap-1 flex-wrap ${hit?'bg-red-50 border border-red-100 rounded-lg px-2 py-1 text-red-800':''}">${icon(i.name)} ${esc(i.name)}${i.allergy.length?`<small class="text-red-400 font-black">${i.allergy.join('·')}</small>`:''}${hit?'<b class="ml-auto bg-red-600 text-white text-[9px] px-1.5 py-0.5 rounded-full">주의</b>':''}</div>`}).join('')}
+  ${x.items.map(i=>{const hit=allergyOn&&i.allergy.some(n=>allergies.has(n));return `<div class="text-xs font-bold my-1.5 leading-snug flex items-center gap-1 flex-wrap ${hit?'bg-red-50 border border-red-100 rounded-lg px-2 py-1 text-red-800':''}">${icon(i.name)} ${esc(disp(i.name))}${i.allergy.length?`<small class="text-red-400 font-black">${i.allergy.join('·')}</small>`:''}${hit?'<b class="ml-auto bg-red-600 text-white text-[9px] px-1.5 py-0.5 rounded-full">주의</b>':''}</div>`}).join('')}
   <footer class="border-t border-dashed mt-2 pt-2 text-[11px] text-gray-400 font-bold">${esc(x.calories||'영양정보 없음')}</footer>
 </article>`}).join('');
 $('#content').innerHTML=`
