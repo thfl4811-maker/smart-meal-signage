@@ -31,6 +31,31 @@ const BAR={rice:'bg-sky-500',soup:'bg-amber-400',main:'bg-emerald-500',side:'bg-
 let cleanMode=localStorage.getItem('cleanMode')!=='0';
 function cleanName(n){let s=n.replace(/\((?:[가-힣](?:,[가-힣])*)\)/g,'').replace(/\*+/g,'').replace(/@/g,'').trim();if(s.length>2&&/중$/.test(s))s=s.slice(0,-1);return s.replace(/\s{2,}/g,' ').trim()||n}
 function disp(n){return (cleanMode||signage||student)?cleanName(n):n}
+const TYPES={normal:{label:'',cls:'',chip:''},selfGreen:{label:'자율',cls:'text-emerald-700',chip:'bg-emerald-100 text-emerald-800 border-emerald-300'},selfBlue:{label:'자율',cls:'text-sky-700',chip:'bg-sky-100 text-sky-800 border-sky-300'},choice:{label:'선택',cls:'text-orange-600',chip:'bg-orange-100 text-orange-800 border-orange-300'}};
+let legend=Object.assign({green:'자율 야채쌈/샐러드 🌿',blue:'자율 반찬 메뉴 🔵',orange:'선택 메뉴 🗳️',notice:'자율 배식대를 통해 밥·국·김치는 자유롭게 추가 이용 가능해요!'},JSON.parse(localStorage.getItem('mealLegend')||'{}'));
+function menuSpan(i){const t=TYPES[i.type]||TYPES.normal;return `<span class="${t.cls}">${esc(disp(i.name))}</span>${t.label?` <span class="text-[9px] font-black px-1.5 py-0.5 rounded-full border ${t.chip}">${t.label}</span>`:''}`}
+function legendBar(){return `<div class="bg-white border border-gray-200 rounded-2xl px-4 py-3.5 my-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
+<div class="flex items-center gap-2.5"><span class="text-2xl">ℹ️</span><div><b class="text-sm font-black block">우리 학교 자율선택급식 안내</b><span class="text-[11px] text-gray-400 font-bold">${esc(legend.notice)}</span></div></div>
+<div class="flex flex-wrap gap-1.5">
+<span class="px-3 py-1.5 bg-emerald-50 border-2 border-emerald-200 text-emerald-800 rounded-xl font-black text-[11px] flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>${esc(legend.green)}</span>
+<span class="px-3 py-1.5 bg-sky-50 border-2 border-sky-200 text-sky-800 rounded-xl font-black text-[11px] flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-sky-500"></span>${esc(legend.blue)}</span>
+<span class="px-3 py-1.5 bg-orange-50 border-2 border-orange-200 text-orange-800 rounded-xl font-black text-[11px] flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>${esc(legend.orange)}</span>
+</div></div>`}
+function openLegend(){const m=$('#modal');m.classList.remove('hidden');m.classList.add('flex');
+m.innerHTML=`<div class="bg-white rounded-3xl p-7 w-full max-w-md">
+<h2 class="text-xl font-black text-center mb-1">🎨 범례 설정</h2>
+<p class="text-center text-xs text-gray-400 font-bold mb-5">우리 학교 기준에 맞게 색깔별 이름과 안내 문구를 정하세요.<br>사이니지·학생 화면에도 그대로 적용됩니다.</p>
+${[['green','bg-emerald-500'],['blue','bg-sky-500'],['orange','bg-orange-500']].map(x=>`
+<div class="flex items-center gap-2 mb-2.5"><span class="w-4 h-4 rounded-full ${x[1]} shrink-0"></span>
+<input id="lg-${x[0]}" class="flex-1 border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold" value="${esc(legend[x[0]])}"></div>`).join('')}
+<label class="text-xs font-black text-gray-500 block mt-4 mb-1.5">상단 안내 문구</label>
+<textarea id="lg-notice" class="w-full border-2 border-gray-200 rounded-xl p-3 text-sm">${esc(legend.notice)}</textarea>
+<div class="flex gap-2 mt-4">
+<button id="lgCancel" class="flex-1 bg-gray-100 hover:bg-gray-200 rounded-xl py-3 font-black text-sm">취소</button>
+<button id="lgSave" class="flex-[2] bg-brand-500 hover:bg-brand-600 text-white rounded-xl py-3 font-black text-sm">저장</button></div></div>`;
+$('#lgCancel').onclick=()=>{m.classList.add('hidden');m.classList.remove('flex')};
+$('#lgSave').onclick=()=>{legend={green:$('#lg-green').value,blue:$('#lg-blue').value,orange:$('#lg-orange').value,notice:$('#lg-notice').value};localStorage.setItem('mealLegend',JSON.stringify(legend));m.classList.add('hidden');m.classList.remove('flex');renderTab()}}
+function normalizeTypes(){Object.values(data).forEach(d=>d.items.forEach(i=>{if(i.type==='self')i.type='selfGreen';else if(i.type==='choiceA'||i.type==='choiceB')i.type='choice';if(!i.type)i.type='normal'}))}
 const p=new URLSearchParams(location.search);
 let school=JSON.parse(localStorage.getItem('meal_school')||'null'),month=p.get('month')||new Date().toISOString().slice(0,7),data={},date='',tab='day',allergies=new Set(JSON.parse(localStorage.getItem('allergies')||'[]')),allergyOn=localStorage.getItem('allergyOn')==='1',source='api';
 const signage=p.get('mode')==='signage',student=p.get('mode')==='student';
@@ -47,12 +72,13 @@ function renderHome(){app.innerHTML=`
         <h1 class="text-xl md:text-2xl font-black text-gray-800 flex items-center gap-2 flex-wrap">스마트 월간식단 뷰어
           <span class="text-xs bg-brand-500 text-white px-3 py-1 rounded-full font-bold">${school?esc(schoolLevel())+' 배식 가이드':'식단 사이니지 2.0'}</span>
         </h1>
-        <p class="text-xs md:text-sm text-gray-400 font-bold">개발자: 영양교사 김소리 · 수정본을 사이니지·학생 화면에 표시합니다.</p>
+        <p class="text-xs md:text-sm text-gray-400 font-bold">API 식단을 정리해 사이니지·학생 화면에 표시합니다.</p>
       </div>
     </div>
     ${school?`<button id="change" class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold px-4 py-2.5 rounded-xl border-2 border-gray-200 transition-all">학교 변경</button>`:''}
   </header>
   ${school?workspace():landing()}
+  <p class="text-center text-[10px] text-white py-6 select-none">영양교사 김소리</p>
   <div id="modal" class="fixed inset-0 bg-slate-900/70 z-50 hidden items-center justify-center p-5"></div>
 </div>`;bind()}
 
@@ -88,9 +114,10 @@ function workspace(){return `
   <button id="signage" class="bg-gray-800 hover:bg-gray-900 text-white font-black px-4 py-2.5 rounded-xl text-sm transition-all">📺 사이니지·공유</button>
   <button id="cleanToggle" class="font-black px-4 py-2.5 rounded-xl text-sm border-2 transition-all ${cleanMode?'bg-brand-50 border-brand-300 text-brand-700':'bg-gray-50 border-gray-200 text-gray-400'}">✨ 메뉴명 자동 정리 ${cleanMode?'ON':'OFF'}</button>
   <label class="bg-sky-50 hover:bg-sky-100 text-sky-700 font-black px-4 py-2.5 rounded-xl text-sm border-2 border-sky-200 transition-all cursor-pointer">📋 월간식단표와 검토<input id="compareExcel" type="file" accept=".xlsx,.xls" class="hidden"></label>
+  <button id="legendBtn" class="bg-violet-50 hover:bg-violet-100 text-violet-700 font-black px-4 py-2.5 rounded-xl text-sm border-2 border-violet-200 transition-all">🎨 범례 설정</button>
 </section>
 <nav class="flex gap-2 mt-4 bg-white border border-gray-200 rounded-2xl p-2 shadow-sm">
-  ${[['day','fa-calendar-day','일간'],['week','fa-calendar-week','주간'],['month','fa-calendar-days','월간'],['edit','fa-pen-to-square','월 전체 편집'],['detail','fa-file-pen','상세 편집']].map(x=>`
+  ${[['day','fa-calendar-day','일간'],['week','fa-calendar-week','주간'],['month','fa-calendar-days','월간'],['edit','fa-pen-to-square','식단 편집']].map(x=>`
   <button data-tab="${x[0]}" class="flex-1 py-3 rounded-xl text-sm font-black transition-all flex items-center justify-center gap-2 ${tab===x[0]?'bg-brand-500 text-white shadow-md':'text-gray-400 hover:text-gray-700 hover:bg-gray-50'}"><i class="fa-solid ${x[1]}"></i> ${x[2]}</button>`).join('')}
 </nav>
 <main id="content" class="mt-4"><div class="bg-white rounded-3xl p-16 text-center text-gray-400">식단을 불러오는 중입니다.</div></main>`}
@@ -106,6 +133,7 @@ function bind(){
   if($('#signage'))$('#signage').onclick=openSignage;
   if($('#cleanToggle'))$('#cleanToggle').onclick=()=>{cleanMode=!cleanMode;localStorage.setItem('cleanMode',cleanMode?'1':'0');renderHome()};
   if($('#compareExcel'))$('#compareExcel').onchange=compareWithExcel;
+  if($('#legendBtn'))$('#legendBtn').onclick=openLegend;
   $$('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;renderHome();});
   if(school&&source==='api')loadApi()}
 
@@ -113,10 +141,10 @@ async function findSchools(){const q=$('#q').value.trim();if(q.length<2)return a
 $('#results').innerHTML=j.map((s,i)=>`<button class="school w-full bg-white border-2 border-gray-200 hover:border-brand-300 rounded-2xl p-4 text-left card-hover" data-i="${i}"><b class="block">${esc(s.schoolName)}</b><span class="text-gray-400 text-xs font-bold">${esc(s.officeName)} · ${esc(s.address)}</span></button>`).join('');
 $$('.school').forEach(b=>b.onclick=()=>{school=j[+b.dataset.i];source='api';localStorage.setItem('meal_school',JSON.stringify(school));localStorage.setItem('meal_school_last',JSON.stringify(school));renderHome()})}
 
-async function loadApi(){try{$('#content').innerHTML='<div class="bg-white rounded-3xl p-16 text-center text-gray-400">나이스 식단을 불러오는 중입니다.</div>';const r=await fetch(`/api/meals?office=${school.officeCode}&school=${school.schoolCode}&month=${month.replace('-','')}`),rows=await r.json();if(!r.ok)throw Error(rows.error);data=parseRows(rows);await applySaved();setDefaultDate();renderTab()}catch(e){$('#content').innerHTML=`<div class="bg-white rounded-3xl p-16 text-center text-gray-400">${esc(e.message)}</div>`}}
+async function loadApi(){try{$('#content').innerHTML='<div class="bg-white rounded-3xl p-16 text-center text-gray-400">나이스 식단을 불러오는 중입니다.</div>';const r=await fetch(`/api/meals?office=${school.officeCode}&school=${school.schoolCode}&month=${month.replace('-','')}`),rows=await r.json();if(!r.ok)throw Error(rows.error);data=parseRows(rows);await applySaved();normalizeTypes();setDefaultDate();renderTab()}catch(e){$('#content').innerHTML=`<div class="bg-white rounded-3xl p-16 text-center text-gray-400">${esc(e.message)}</div>`}}
 function parseRows(rows){const out={};rows.filter(r=>r.mealCode==='2').forEach(r=>{const d=`${r.date.slice(0,4)}-${r.date.slice(4,6)}-${r.date.slice(6,8)}`;const items=r.dishes.split('<br/>').map(parseDish).filter(Boolean);const nutrient={};String(r.nutrients||'').split(/<br\s*\/?>/i).forEach(x=>{const m=x.match(/^(.+?)(?:\(([^)]+)\))?\s*:\s*([\d.,]+)\s*(.*)$/);if(m)nutrient[m[1].trim()]={value:m[3],unit:(m[2]||m[4]||'').trim()}});out[d]={date:d,items,calories:r.calories,nutrient,origin:r.origin||'',note:'',edited:false}});return out}
-function parseDish(t){t=t.replace(/<[^>]+>/g,'').trim();if(!t)return null;const al=[];for(const m of t.matchAll(/\(([\d.]+)\)/g))m[1].split('.').map(Number).forEach(n=>n>=1&&n<=19&&al.push(n));let name=t.replace(/\(([\d.]+)\)/g,'').trim(),type=/자율/.test(name)?'self':'normal';return{name,allergy:[...new Set(al)],type,category:'',order:0}}
-async function applySaved(){try{const r=await fetch(`/api/project?office=${school.officeCode}&school=${school.schoolCode}&month=${month}`),j=await r.json();if(j?.payload?.days)data=j.payload.days}catch{}}
+function parseDish(t){t=t.replace(/<[^>]+>/g,'').trim();if(!t)return null;const al=[];for(const m of t.matchAll(/\(([\d.]+)\)/g))m[1].split('.').map(Number).forEach(n=>n>=1&&n<=19&&al.push(n));let name=t.replace(/\(([\d.]+)\)/g,'').trim();let type='normal';if(/자율/.test(name))type='selfGreen';else if(/\[선택\]/.test(name))type='choice';return{name,allergy:[...new Set(al)],type,category:'',order:0}}
+async function applySaved(){try{const r=await fetch(`/api/project?office=${school.officeCode}&school=${school.schoolCode}&month=${month}`),j=await r.json();if(j?.payload?.days)data=j.payload.days;if(j?.payload?.legend){legend=j.payload.legend;localStorage.setItem('mealLegend',JSON.stringify(legend))}}catch{}}
 function setDefaultDate(){const today=new Date().toISOString().slice(0,10);date=data[today]?today:Object.keys(data).sort()[0]||''}
 
 function parseExcelBook(book){
@@ -183,7 +211,7 @@ data=parsed;school={officeCode:'EXCEL',schoolCode:`LOCAL-${year}${mon}`,schoolNa
 alert(`${school.schoolName} ${year}년 ${Number(mon)}월 식단 ${Object.keys(data).length}일을 불러왔습니다.`);
 }catch(err){alert(`엑셀 업로드 실패: ${err.message}`);e.target.value='';}}
 
-function renderTab(){if(!$('#content'))return;({day:renderDay,week:renderWeek,month:renderMonth,edit:renderEdit,detail:renderDetail}[tab]||renderDay)()}
+function renderTab(){if(!$('#content'))return;({day:renderDay,week:renderWeek,month:renderMonth,edit:renderEdit}[tab]||renderDay)()}
 
 /* ═══════ 일간 (STEP 카드 + AI팁) ═══════ */
 function grouped(x){const g={};STEPS.forEach(([k])=>g[k]=[]);x.items.forEach(i=>g[stepOf(i.name)].push(i));return g}
@@ -195,7 +223,7 @@ return `<article class="bg-white border-2 ${hit?'border-red-400 bg-red-50/40':'b
   <div class="flex items-center gap-3 mt-4 mb-1">
     <span class="text-4xl">${emo}</span>
     <div>
-      <h3 class="font-black text-lg leading-tight">${esc(disp(i.name))}</h3>
+      <h3 class="font-black text-lg leading-tight">${menuSpan(i)}</h3>
       ${i.allergy.length?`<span class="text-[11px] font-black text-red-500 bg-red-50 border border-red-100 px-2 py-0.5 rounded-full">알레르기: ${i.allergy.join(',')}</span>`:'<span class="text-[11px] font-bold text-gray-300 bg-gray-50 px-2 py-0.5 rounded-full">안심 메뉴</span>'}
     </div>
   </div>
@@ -227,7 +255,7 @@ $('#content').innerHTML=`
   <button id="next" class="w-11 h-11 rounded-2xl bg-white/20 hover:bg-white/30 font-black text-xl transition-all">›</button>
   <button id="today" class="px-4 h-11 rounded-2xl bg-white text-brand-700 font-black text-sm">오늘 급식</button>
 </section>
-${filterBanner()}
+${legendBar()}${filterBanner()}
 <section class="grid lg:grid-cols-12 gap-5 mt-4">
   <div class="lg:col-span-8"><div class="grid md:grid-cols-2 xl:grid-cols-3 gap-4">${stepCards(x)}</div>
     <div class="mt-5 bg-white border border-gray-200 rounded-3xl p-5 flex flex-wrap justify-around items-center gap-4 text-center shadow-sm">
@@ -244,7 +272,7 @@ ${filterBanner()}
       <h3 class="font-black text-base mb-1 flex items-center gap-2"><i class="fa-solid fa-list-check text-brand-600"></i> 오늘 급식 전체 리스트</h3>
       <p class="text-xs text-gray-400 font-bold mb-4">알레르기 유무를 큰 글씨로 점검하세요.</p>
       <ul class="space-y-2.5">${x.items.map(i=>{const hit=allergyOn&&i.allergy.some(a=>allergies.has(a));
-        return `<li class="flex items-center gap-2 text-sm font-bold ${hit?'bg-red-50 border border-red-100 rounded-xl px-3 py-2 text-red-800':''}">${icon(i.name)} ${esc(disp(i.name))}${i.allergy.length?`<small class="text-red-500 font-black">${i.allergy.join('·')}</small>`:''}${hit?'<b class="ml-auto bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full">주의</b>':''}</li>`}).join('')}</ul>
+        return `<li class="flex items-center gap-2 text-sm font-bold ${hit?'bg-red-50 border border-red-100 rounded-xl px-3 py-2 text-red-800':''}">${icon(i.name)} ${menuSpan(i)}${i.allergy.length?`<small class="text-red-500 font-black">${i.allergy.join('·')}</small>`:''}${hit?'<b class="ml-auto bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full">주의</b>':''}</li>`}).join('')}</ul>
     </div>
     <div class="bg-slate-50 border border-gray-100 rounded-3xl p-5">
       <h3 class="font-black text-base mb-4 flex items-center gap-1.5"><span class="text-xl">💡</span> AI 영양교사의 오늘 식단 팁</h3>
@@ -266,7 +294,7 @@ $('#content').innerHTML=`
     <button id="wnext" class="bg-white border-2 border-gray-200 rounded-xl px-4 py-2 font-black text-sm">다음 주 ›</button>
   </div>
 </div>
-${filterBanner()}
+${legendBar()}${filterBanner()}
 <div class="grid md:grid-cols-5 gap-3">
   ${days.map(d=>{const x=data[d],dt=new Date(d+'T00:00:00');const dayHit=x&&allergyOn&&x.items.some(i=>i.allergy.some(n=>allergies.has(n)));
   return `<article class="bg-white border-2 ${dayHit?'border-red-400':'border-gray-200'} rounded-3xl p-4 min-h-56 ${x?'cursor-pointer card-hover':''} shadow-sm" ${x?`data-date="${d}"`:''}>
@@ -274,7 +302,7 @@ ${filterBanner()}
       <b class="text-sm font-black">${dt.getMonth()+1}/${dt.getDate()} ${'일월화수목금토'[dt.getDay()]}</b>
       ${dayHit?'<span class="text-[10px] bg-red-100 text-red-700 font-black px-2 py-0.5 rounded-full">주의</span>':''}
     </div>
-    ${x?x.items.map(i=>{const hit=allergyOn&&i.allergy.some(n=>allergies.has(n));return `<div class="text-xs font-bold my-1.5 leading-snug ${hit?'bg-red-50 rounded-lg px-2 py-1 text-red-800':''}">${icon(i.name)} ${esc(disp(i.name))}</div>`}).join('')+`<footer class="border-t border-dashed mt-2 pt-2 text-[11px] text-gray-400 font-bold">${esc(x.calories||'')}</footer>`
+    ${x?x.items.map(i=>{const hit=allergyOn&&i.allergy.some(n=>allergies.has(n));return `<div class="text-xs font-bold my-1.5 leading-snug ${hit?'bg-red-50 rounded-lg px-2 py-1 text-red-800':''}">${icon(i.name)} ${menuSpan(i)}</div>`}).join('')+`<footer class="border-t border-dashed mt-2 pt-2 text-[11px] text-gray-400 font-bold">${esc(x.calories||'')}</footer>`
     :'<p class="text-xs text-gray-300 text-center mt-10 font-bold">급식 없음</p>'}
   </article>`}).join('')}
 </div>`;
@@ -290,7 +318,7 @@ return `<article class="bg-white border-2 ${dayHit?'border-red-400 shadow-red-10
     <b class="text-sm font-black">${dt.getMonth()+1}월 ${dt.getDate()}일 ${'일월화수목금토'[dt.getDay()]}요일</b>
     <div class="flex gap-1">${dayHit?'<span class="text-[10px] bg-red-100 text-red-700 font-black px-2 py-0.5 rounded-full">알레르기 주의</span>':''}${x.edited?'<span class="text-[10px] bg-brand-50 text-brand-700 font-black px-2 py-0.5 rounded-full">수정됨</span>':''}</div>
   </div>
-  ${x.items.map(i=>{const hit=allergyOn&&i.allergy.some(n=>allergies.has(n));return `<div class="text-xs font-bold my-1.5 leading-snug flex items-center gap-1 flex-wrap ${hit?'bg-red-50 border border-red-100 rounded-lg px-2 py-1 text-red-800':''}">${icon(i.name)} ${esc(disp(i.name))}${i.allergy.length?`<small class="text-red-400 font-black">${i.allergy.join('·')}</small>`:''}${hit?'<b class="ml-auto bg-red-600 text-white text-[9px] px-1.5 py-0.5 rounded-full">주의</b>':''}</div>`}).join('')}
+  ${x.items.map(i=>{const hit=allergyOn&&i.allergy.some(n=>allergies.has(n));return `<div class="text-xs font-bold my-1.5 leading-snug flex items-center gap-1 flex-wrap ${hit?'bg-red-50 border border-red-100 rounded-lg px-2 py-1 text-red-800':''}">${icon(i.name)} ${menuSpan(i)}${i.allergy.length?`<small class="text-red-400 font-black">${i.allergy.join('·')}</small>`:''}${hit?'<b class="ml-auto bg-red-600 text-white text-[9px] px-1.5 py-0.5 rounded-full">주의</b>':''}</div>`}).join('')}
   <footer class="border-t border-dashed mt-2 pt-2 text-[11px] text-gray-400 font-bold">${esc(x.calories||'영양정보 없음')}</footer>
 </article>`}).join('');
 $('#content').innerHTML=`
@@ -308,7 +336,7 @@ $('#content').innerHTML=`
   </aside>
   <div class="lg:col-span-9">
     <div class="flex items-center justify-between mb-3"><h2 class="text-xl font-black">${month} 전체 식단</h2></div>
-    ${filterBanner()}
+    ${legendBar()}${filterBanner()}
     <section class="grid md:grid-cols-2 xl:grid-cols-3 gap-3 mt-2">${cards||'<div class="bg-white rounded-3xl p-16 text-center text-gray-400 col-span-full">식단이 없습니다.</div>'}</section>
   </div>
 </div>`;
@@ -319,16 +347,46 @@ $$('[data-date]').forEach(c=>c.onclick=()=>{date=c.dataset.date;tab='day';render
 function filterBanner(){if(!allergyOn||!allergies.size)return'';return `<div class="flex gap-2 flex-wrap items-center bg-white border-2 border-red-200 rounded-2xl px-4 py-3 my-3"><b class="text-sm font-black">🚨 알레르기 필터 적용 중</b>${[...allergies].map(n=>`<span class="bg-red-100 text-red-700 rounded-full px-2.5 py-1 text-[11px] font-black">${n} ${A[n]}</span>`).join('')}</div>`}
 function move(n){const ds=Object.keys(data).sort(),i=ds.indexOf(date);if(ds[i+n]){date=ds[i+n];renderDay()}}
 
-/* ═══════ 편집 (기존 유지) ═══════ */
-function renderEdit(){const rows=Object.keys(data).sort().flatMap(d=>data[d].items.map((i,k)=>`<tr data-d="${d}" data-i="${k}" class="border-b border-gray-100"><td class="p-2 text-xs font-bold">${d.slice(5)}</td><td class="p-2"><input class="name w-full border-2 border-gray-200 rounded-lg px-2 py-1.5 text-sm" value="${esc(i.name)}"></td><td class="p-2"><input class="alg w-24 border-2 border-gray-200 rounded-lg px-2 py-1.5 text-sm" value="${i.allergy.join(',')}"></td><td class="p-2"><select class="type border-2 border-gray-200 rounded-lg px-2 py-1.5 text-sm"><option value="normal">일반</option><option value="choiceA" ${i.type==='choiceA'?'selected':''}>선택 A</option><option value="choiceB" ${i.type==='choiceB'?'selected':''}>선택 B</option><option value="self" ${i.type==='self'?'selected':''}>자율배식</option></select></td><td class="p-2"><button class="saveRow bg-gray-100 hover:bg-gray-200 rounded-lg px-3 py-1.5 text-xs font-black">적용</button></td></tr>`)).join('');
+/* ═══════ 식단 편집 (아코디언 + 색 지정 + 즉시 반영) ═══════ */
+let editOpen=new Set();
+function editRow(d,k,i){const cur=i.type||'normal';
+const btn=(t,emo,title)=>`<button data-type-btn="${t}" data-d="${d}" data-k="${k}" title="${esc(title)}" class="w-9 h-9 rounded-lg border-2 text-sm transition-all ${cur===t?'border-gray-800 bg-white shadow':'border-gray-200 bg-gray-50 opacity-40 hover:opacity-80'}">${emo}</button>`;
+return `<div class="flex flex-wrap items-center gap-1.5">
+<span class="flex flex-col text-[10px] leading-none"><button data-up="${d}|${k}" class="text-gray-300 hover:text-gray-600 px-1">▲</button><button data-down="${d}|${k}" class="text-gray-300 hover:text-gray-600 px-1">▼</button></span>
+<input class="ename flex-1 min-w-36 border-2 border-gray-200 rounded-lg px-2.5 py-2 text-sm font-bold ${TYPES[cur].cls}" data-d="${d}" data-k="${k}" value="${esc(i.name)}">
+<input class="ealg w-24 border-2 border-gray-200 rounded-lg px-2 py-2 text-xs" data-d="${d}" data-k="${k}" placeholder="알레르기" value="${i.allergy.join(',')}">
+${btn('normal','⬜','일반')}${btn('selfGreen','🟢',legend.green)}${btn('selfBlue','🔵',legend.blue)}${btn('choice','🟠',legend.orange)}
+<button data-del="${d}|${k}" class="w-9 h-9 rounded-lg bg-red-50 text-red-500 border-2 border-red-100 text-sm font-black hover:bg-red-100">✕</button>
+</div>`}
+function renderEdit(){const dates=Object.keys(data).sort();if(!editOpen.size&&date)editOpen.add(date);
 $('#content').innerHTML=`<section class="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm">
-<div class="flex items-center justify-between mb-4"><h2 class="text-xl font-black">월 전체 편집</h2><div class="flex gap-2"><button id="replace" class="bg-gray-100 hover:bg-gray-200 rounded-xl px-4 py-2.5 text-sm font-black">찾아 바꾸기</button><button id="saveAll" class="bg-brand-500 hover:bg-brand-600 text-white rounded-xl px-4 py-2.5 text-sm font-black">전체 저장</button></div></div>
-<div class="overflow-auto"><table class="w-full min-w-[850px] border-collapse"><thead><tr class="border-b-2 border-gray-200 text-left text-xs font-black text-gray-400"><th class="p-2">날짜</th><th class="p-2">메뉴명</th><th class="p-2">알레르기</th><th class="p-2">표시</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
-$$('.saveRow').forEach(b=>b.onclick=()=>applyRow(b.closest('tr')));$('#replace').onclick=replaceAll;$('#saveAll').onclick=saveProject}
-function applyRow(tr){const x=data[tr.dataset.d].items[+tr.dataset.i];x.name=tr.querySelector('.name').value;x.allergy=tr.querySelector('.alg').value.split(',').map(Number).filter(n=>n>=1&&n<=19);x.type=tr.querySelector('.type').value;data[tr.dataset.d].edited=true}
+<div class="flex flex-wrap items-center justify-between gap-2 mb-1"><h2 class="text-xl font-black">식단 편집</h2>
+<div class="flex gap-2 flex-wrap"><button id="legendBtn2" class="bg-violet-50 hover:bg-violet-100 text-violet-700 rounded-xl px-4 py-2.5 text-sm font-black border-2 border-violet-200">🎨 범례 설정</button><button id="replace" class="bg-gray-100 hover:bg-gray-200 rounded-xl px-4 py-2.5 text-sm font-black">찾아 바꾸기</button><button id="saveAll" class="bg-brand-500 hover:bg-brand-600 text-white rounded-xl px-4 py-2.5 text-sm font-black">전체 저장</button></div></div>
+<p class="text-xs text-gray-400 font-bold mb-4">수정하면 즉시 반영돼요. 색 버튼: 🟢 ${esc(legend.green)} · 🔵 ${esc(legend.blue)} · 🟠 ${esc(legend.orange)} — 마지막에 전체 저장을 눌러주세요.</p>
+<div class="space-y-2">
+${dates.map(d=>{const x=data[d],dt=new Date(d+'T00:00:00');return `
+<details data-day="${d}" ${editOpen.has(d)?'open':''} class="border-2 border-gray-100 rounded-2xl overflow-hidden">
+<summary class="cursor-pointer px-4 py-3 bg-slate-50 hover:bg-slate-100 flex items-center gap-2 font-black text-sm">
+${dt.getMonth()+1}월 ${dt.getDate()}일 (${'일월화수목금토'[dt.getDay()]}) <span class="text-gray-400 font-bold">· 메뉴 ${x.items.length}개</span>${x.edited?'<span class="text-[10px] bg-brand-50 text-brand-700 px-2 py-0.5 rounded-full">수정됨</span>':''}
+</summary>
+<div class="p-4 space-y-1.5">
+${x.items.map((i,k)=>editRow(d,k,i)).join('')}
+<button data-add="${d}" class="text-xs font-black bg-gray-100 hover:bg-gray-200 rounded-xl px-3 py-2 mt-1">＋ 메뉴 추가</button>
+<textarea data-note="${d}" class="w-full border-2 border-gray-100 rounded-xl p-3 text-xs mt-2" placeholder="이 날짜 안내문 (선택)">${esc(x.note||'')}</textarea>
+</div></details>`}).join('')}
+</div></section>`;
+$$('details[data-day]').forEach(dt=>{dt.addEventListener('toggle',()=>{dt.open?editOpen.add(dt.dataset.day):editOpen.delete(dt.dataset.day)})});
+$$('.ename').forEach(el=>el.onchange=()=>{data[el.dataset.d].items[+el.dataset.k].name=el.value;data[el.dataset.d].edited=true});
+$$('.ealg').forEach(el=>el.onchange=()=>{data[el.dataset.d].items[+el.dataset.k].allergy=el.value.split(/[,.·\s]+/).map(Number).filter(n=>n>=1&&n<=19);data[el.dataset.d].edited=true});
+$$('[data-type-btn]').forEach(b=>b.onclick=()=>{data[b.dataset.d].items[+b.dataset.k].type=b.dataset.typeBtn;data[b.dataset.d].edited=true;renderEdit()});
+$$('[data-del]').forEach(b=>b.onclick=()=>{const[d,k]=b.dataset.del.split('|');data[d].items.splice(+k,1);data[d].edited=true;renderEdit()});
+$$('[data-up]').forEach(b=>b.onclick=()=>{const[d,k]=b.dataset.up.split('|');const a=data[d].items,i=+k;if(i>0){[a[i-1],a[i]]=[a[i],a[i-1]];data[d].edited=true;renderEdit()}});
+$$('[data-down]').forEach(b=>b.onclick=()=>{const[d,k]=b.dataset.down.split('|');const a=data[d].items,i=+k;if(i<a.length-1){[a[i+1],a[i]]=[a[i],a[i+1]];data[d].edited=true;renderEdit()}});
+$$('[data-add]').forEach(b=>b.onclick=()=>{data[b.dataset.add].items.push({name:'새 메뉴',allergy:[],type:'normal',category:'',order:0});data[b.dataset.add].edited=true;editOpen.add(b.dataset.add);renderEdit()});
+$$('[data-note]').forEach(el=>el.onchange=()=>{data[el.dataset.note].note=el.value;data[el.dataset.note].edited=true});
+$('#legendBtn2').onclick=openLegend;$('#replace').onclick=replaceAll;$('#saveAll').onclick=saveProject}
 function replaceAll(){const a=prompt('찾을 내용'),b=a!==null?prompt('바꿀 내용',''):null;if(a===null||b===null)return;Object.values(data).forEach(d=>d.items.forEach(i=>{i.name=i.name.split(a).join(b)}));renderEdit()}
-function renderDetail(){if(!date)setDefaultDate();const x=data[date];$('#content').innerHTML=`<section class="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm"><div class="flex items-center justify-between mb-4"><h2 class="text-xl font-black">${date} 상세 편집</h2><button id="detailSave" class="bg-brand-500 hover:bg-brand-600 text-white rounded-xl px-4 py-2.5 text-sm font-black">이 날짜 저장</button></div><textarea id="note" class="w-full min-h-32 border-2 border-gray-200 rounded-2xl p-4 text-sm" placeholder="오늘의 안내문">${esc(x?.note||'')}</textarea><p class="text-xs text-gray-400 font-bold mt-3">메뉴 추가·삭제와 세부 편집은 월 전체 편집에서 진행합니다.</p></section>`;$('#detailSave').onclick=()=>{x.note=$('#note').value;x.edited=true;saveProject()}}
-async function saveProject(){$$('tbody tr').forEach(applyRow);const password=prompt('이 학교의 편집 비밀번호를 입력하세요. 처음 저장할 때 설정됩니다.');if(!password)return;const r=await fetch('/api/project',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({office:school.officeCode,school:school.schoolCode,schoolName:school.schoolName,month,password,payload:{days:data}})}),j=await r.json();alert(r.ok?'저장되었습니다.':j.error)}
+async function saveProject(){const password=prompt('이 학교의 편집 비밀번호를 입력하세요. 처음 저장할 때 설정됩니다.');if(!password)return;const r=await fetch('/api/project',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({office:school.officeCode,school:school.schoolCode,schoolName:school.schoolName,month,password,payload:{days:data,legend}})}),j=await r.json();alert(r.ok?'저장되었습니다.':j.error)}
 
 /* ═══════ 알레르기 모달 (기존 유지) ═══════ */
 function openFilter(){const m=$('#modal');m.classList.remove('hidden');m.classList.add('flex');
