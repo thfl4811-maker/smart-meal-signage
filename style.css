@@ -7,3 +7,28 @@ body{font-family:'Noto Sans KR',sans-serif}
 .signage-kiosk .pub-wrap{max-width:640px}
 .signage-standby .pub-wrap{max-width:900px}
 @media print{.no-print{display:none}}
+
+/* ══════════════════════════════════════════════════════════
+   컨테이너 폭 기반 반응형 레이아웃
+   (Tailwind의 md:/xl: 는 "화면 전체 폭" 기준이라, 사이니지·키오스크처럼
+   pub-wrap 자체가 640px/900px로 좁혀진 상태에서는 화면은 넓은데 상자는
+   좁아서 grid-cols가 억지로 3열로 발동 → 글자가 세로로 다 쪼개지는
+   문제가 생김. flex-wrap + flex-basis는 "실제 박스 폭"을 기준으로
+   줄바꿈하므로 어떤 화면·모드에서도 안전하게 깨지지 않음. ── */
+
+.day-layout{display:flex;flex-wrap:wrap;gap:1.25rem}
+.day-main{flex:2 1 480px;min-width:0}
+.day-aside{flex:1 1 300px;min-width:0}
+
+.step-grid{display:flex;flex-wrap:wrap;gap:1rem}
+.step-card{flex:1 1 240px;min-width:0}
+
+.week-grid{display:flex;flex-wrap:wrap;gap:.75rem}
+.week-card{flex:1 1 150px;min-width:0}
+
+.month-layout{display:flex;flex-wrap:wrap;gap:1.25rem}
+.month-aside{flex:1 1 220px;min-width:0}
+.month-main{flex:3 1 480px;min-width:0}
+
+.month-cards-grid{display:flex;flex-wrap:wrap;gap:.75rem}
+.month-card{flex:1 1 260px;min-width:0}
