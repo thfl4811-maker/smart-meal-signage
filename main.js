@@ -189,7 +189,7 @@ function renderTab(){if(!$('#content'))return;({day:renderDay,week:renderWeek,mo
 function grouped(x){const g={};STEPS.forEach(([k])=>g[k]=[]);x.items.forEach(i=>g[stepOf(i.name)].push(i));return g}
 function stepCards(x){const lv=schoolLevel(),g=grouped(x);let n=0;
 return STEPS.flatMap(([key,label,emo])=>g[key].map(i=>{n++;const hit=allergyOn&&i.allergy.some(a=>allergies.has(a));const[pct,tip]=PORTION[key][lv];
-return `<article class="bg-white border-2 ${hit?'border-red-400 bg-red-50/40':'border-gray-200'} rounded-3xl p-5 shadow-sm relative card-hover">
+return `<article class="step-card bg-white border-2 ${hit?'border-red-400 bg-red-50/40':'border-gray-200'} rounded-3xl p-5 shadow-sm relative card-hover">
   ${hit?'<span class="absolute top-3 right-3 bg-red-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full">주의</span>':''}
   <span class="text-[11px] font-black text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg">STEP ${String(n).padStart(2,'0')} · ${label}</span>
   <div class="flex items-center gap-3 mt-4 mb-1">
@@ -228,8 +228,8 @@ $('#content').innerHTML=`
   <button id="today" class="px-4 h-11 rounded-2xl bg-white text-brand-700 font-black text-sm">오늘 급식</button>
 </section>
 ${filterBanner()}
-<section class="grid lg:grid-cols-12 gap-5 mt-4">
-  <div class="lg:col-span-8"><div class="grid md:grid-cols-2 xl:grid-cols-3 gap-4">${stepCards(x)}</div>
+<section class="day-layout mt-4">
+  <div class="day-main"><div class="step-grid">${stepCards(x)}</div>
     <div class="mt-5 bg-white border border-gray-200 rounded-3xl p-5 flex flex-wrap justify-around items-center gap-4 text-center shadow-sm">
       <div><span class="text-xs text-gray-400 block font-black">🔥 에너지</span><span class="text-2xl font-black text-sky-600">${esc(x.calories||'-')}</span></div>
       ${['탄수화물','단백질','지방','칼슘','철분'].map((k,i)=>{const v=x.nutrient[k];if(!v)return'';return `<div class="hidden md:block w-px h-10 bg-gray-200"></div><div><span class="text-xs text-gray-400 block font-black">${['🍞','🥩','🥑','🥛','🔩'][i]} ${k}</span><span class="text-2xl font-black text-gray-700">${v.value}<small class="text-sm">${esc(v.unit)}</small></span></div>`}).join('')}
@@ -239,7 +239,7 @@ ${filterBanner()}
       <div class="flex flex-wrap gap-1.5">${x.origin.split(/<br\s*\/?>/i).filter(Boolean).map(o=>`<span class="text-[11px] font-bold bg-slate-50 border border-gray-200 text-gray-500 rounded-full px-2.5 py-1">${esc(o.trim())}</span>`).join('')}</div>
     </div>`:''}
   </div>
-  <aside class="lg:col-span-4 space-y-4">
+  <aside class="day-aside space-y-4">
     <div class="bg-white border border-gray-200 rounded-3xl p-5 shadow-sm">
       <h3 class="font-black text-base mb-1 flex items-center gap-2"><i class="fa-solid fa-list-check text-brand-600"></i> 오늘 급식 전체 리스트</h3>
       <p class="text-xs text-gray-400 font-bold mb-4">알레르기 유무를 큰 글씨로 점검하세요.</p>
@@ -267,9 +267,9 @@ $('#content').innerHTML=`
   </div>
 </div>
 ${filterBanner()}
-<div class="grid md:grid-cols-5 gap-3">
+<div class="week-grid">
   ${days.map(d=>{const x=data[d],dt=new Date(d+'T00:00:00');const dayHit=x&&allergyOn&&x.items.some(i=>i.allergy.some(n=>allergies.has(n)));
-  return `<article class="bg-white border-2 ${dayHit?'border-red-400':'border-gray-200'} rounded-3xl p-4 min-h-56 ${x?'cursor-pointer card-hover':''} shadow-sm" ${x?`data-date="${d}"`:''}>
+  return `<article class="week-card bg-white border-2 ${dayHit?'border-red-400':'border-gray-200'} rounded-3xl p-4 min-h-56 ${x?'cursor-pointer card-hover':''} shadow-sm" ${x?`data-date="${d}"`:''}>
     <div class="flex justify-between items-center mb-3 pb-2 border-b border-gray-100">
       <b class="text-sm font-black">${dt.getMonth()+1}/${dt.getDate()} ${'일월화수목금토'[dt.getDay()]}</b>
       ${dayHit?'<span class="text-[10px] bg-red-100 text-red-700 font-black px-2 py-0.5 rounded-full">주의</span>':''}
@@ -285,7 +285,7 @@ function nearest(d){const t=d.toISOString().slice(0,10);if(data[t])return t;cons
 
 /* ═══════ 월간 (왼쪽 알레르기 패널) ═══════ */
 function renderMonth(){const cards=Object.keys(data).sort().map(d=>{const x=data[d],dt=new Date(d+'T00:00:00');const dayHit=allergyOn&&x.items.some(i=>i.allergy.some(n=>allergies.has(n)));
-return `<article class="bg-white border-2 ${dayHit?'border-red-400 shadow-red-100':'border-gray-200'} rounded-3xl p-4 min-h-56 cursor-pointer card-hover shadow-sm" data-date="${d}">
+return `<article class="month-card bg-white border-2 ${dayHit?'border-red-400 shadow-red-100':'border-gray-200'} rounded-3xl p-4 min-h-56 cursor-pointer card-hover shadow-sm" data-date="${d}">
   <div class="flex justify-between items-center mb-2 pb-2 border-b border-gray-100">
     <b class="text-sm font-black">${dt.getMonth()+1}월 ${dt.getDate()}일 ${'일월화수목금토'[dt.getDay()]}요일</b>
     <div class="flex gap-1">${dayHit?'<span class="text-[10px] bg-red-100 text-red-700 font-black px-2 py-0.5 rounded-full">알레르기 주의</span>':''}${x.edited?'<span class="text-[10px] bg-brand-50 text-brand-700 font-black px-2 py-0.5 rounded-full">수정됨</span>':''}</div>
@@ -294,8 +294,8 @@ return `<article class="bg-white border-2 ${dayHit?'border-red-400 shadow-red-10
   <footer class="border-t border-dashed mt-2 pt-2 text-[11px] text-gray-400 font-bold">${esc(x.calories||'영양정보 없음')}</footer>
 </article>`}).join('');
 $('#content').innerHTML=`
-<div class="grid lg:grid-cols-12 gap-5">
-  <aside class="lg:col-span-3">
+<div class="month-layout">
+  <aside class="month-aside">
     <div class="bg-white border border-gray-200 rounded-3xl p-5 shadow-sm lg:sticky lg:top-24">
       <h3 class="font-black text-base mb-1 flex items-center gap-2">🚨 알레르기 필터</h3>
       <p class="text-xs text-gray-400 font-bold mb-4">번호를 누르면 해당 메뉴가 오른쪽에서 강조돼요.</p>
@@ -306,10 +306,10 @@ $('#content').innerHTML=`
       <div class="mt-3 text-center text-xs font-black ${allergies.size?'text-red-600':'text-gray-300'}">${allergies.size?`${allergies.size}개 선택 · 필터 켜짐`:'선택 없음'}</div>
     </div>
   </aside>
-  <div class="lg:col-span-9">
+  <div class="month-main">
     <div class="flex items-center justify-between mb-3"><h2 class="text-xl font-black">${month} 전체 식단</h2></div>
     ${filterBanner()}
-    <section class="grid md:grid-cols-2 xl:grid-cols-3 gap-3 mt-2">${cards||'<div class="bg-white rounded-3xl p-16 text-center text-gray-400 col-span-full">식단이 없습니다.</div>'}</section>
+    <section class="month-cards-grid mt-2">${cards||'<div class="bg-white rounded-3xl p-16 text-center text-gray-400">식단이 없습니다.</div>'}</section>
   </div>
 </div>`;
 $$('[data-sa]').forEach(b=>b.onclick=()=>{const n=+b.dataset.sa;allergies.has(n)?allergies.delete(n):allergies.add(n);allergyOn=allergies.size>0;localStorage.setItem('allergies',JSON.stringify([...allergies]));localStorage.setItem('allergyOn',allergyOn?'1':'0');renderMonth()});
