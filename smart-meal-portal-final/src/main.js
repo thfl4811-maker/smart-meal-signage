@@ -16,14 +16,15 @@ function stepOf(name){const n=name.replace(/\s/g,'');
   if(KW.rice.some(w=>n.includes(w)))return 'rice';
   if(KW.main.some(w=>n.includes(w)))return 'main';
   return 'side';}
-function schoolLevel(){const n=school?.schoolName||'';if(/초등/.test(n))return'초등';if(/중학/.test(n))return'중등';return'고등';}
+function schoolLevel(){const n=school?.schoolName||'';if(/유치원/.test(n))return'유치원';if(/초등/.test(n))return'초등';if(/중학/.test(n))return'중등';return'고등';}
+function lvName(lv){return lv==='유치원'?'유치원 어린이':lv+'학생'}
 const PORTION={
-  rice:{초등:[70,'어린이 주먹 1.5개 분량'],중등:[85,'야구공 1개 수북이 분량'],고등:[100,'테니스공 1개 분량 (1인 식판 밥칸 가득)']},
-  soup:{초등:[50,'국그릇 절반, 건더기 위주'],중등:[50,'건더기 위주 수북이 + 국물 절반'],고등:[50,'건더기 위주 수북이 + 국물 3분의 1']},
-  main:{초등:[80,'어린이 손바닥 크기 분량'],중등:[90,'종이컵 1컵 분량'],고등:[100,'종이컵 1컵 수북이 분량']},
-  side:{초등:[60,'종이컵 3분의 1 분량'],중등:[70,'종이컵 절반 분량'],고등:[70,'종이컵 1/2컵 한 젓가락 분량']},
-  kimchi:{초등:[30,'집게 기준 1회 가볍게 배식'],중등:[40,'집게 기준 약 2회 가볍게 배식'],고등:[40,'집게 기준 약 2회 가볍게 배식']},
-  dessert:{초등:[100,'개별 포장 1개 정량 섭취'],중등:[100,'개별 포장 1개 정량 섭취'],고등:[100,'개별 포장 1개 정량 섭취']},
+  rice:{유치원:[50,'어린이 주먹 1개 분량'],초등:[70,'어린이 주먹 1.5개 분량'],중등:[85,'야구공 1개 수북이 분량'],고등:[100,'테니스공 1개 분량 (1인 식판 밥칸 가득)']},
+  soup:{유치원:[40,'국그릇 3분의 1, 건더기 위주'],초등:[50,'국그릇 절반, 건더기 위주'],중등:[50,'건더기 위주 수북이 + 국물 절반'],고등:[50,'건더기 위주 수북이 + 국물 3분의 1']},
+  main:{유치원:[60,'어린이 손바닥 절반 분량'],초등:[80,'어린이 손바닥 크기 분량'],중등:[90,'종이컵 1컵 분량'],고등:[100,'종이컵 1컵 수북이 분량']},
+  side:{유치원:[40,'종이컵 3분의 1 분량'],초등:[60,'종이컵 3분의 1 분량'],중등:[70,'종이컵 절반 분량'],고등:[70,'종이컵 1/2컵 한 젓가락 분량']},
+  kimchi:{유치원:[20,'집게 기준 1회 가볍게 배식'],초등:[30,'집게 기준 1회 가볍게 배식'],중등:[40,'집게 기준 약 2회 가볍게 배식'],고등:[40,'집게 기준 약 2회 가볍게 배식']},
+  dessert:{유치원:[100,'개별 포장 1개 정량 섭취'],초등:[100,'개별 포장 1개 정량 섭취'],중등:[100,'개별 포장 1개 정량 섭취'],고등:[100,'개별 포장 1개 정량 섭취']},
 };
 const BAR={rice:'bg-sky-500',soup:'bg-amber-400',main:'bg-emerald-500',side:'bg-teal-400',kimchi:'bg-orange-500',dessert:'bg-rose-500'};
 
@@ -140,7 +141,9 @@ function bind(){
 function fetchT(url,ms=15000){const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);return fetch(url,{signal:c.signal}).finally(()=>clearTimeout(t))}
 async function findSchools(){const q=$('#q').value.trim();if(q.length<2)return alert('두 글자 이상 입력하세요.');$('#results').innerHTML='<p class="text-gray-400 text-sm">검색 중…</p>';let r,j;try{r=await fetchT('/api/schools?q='+encodeURIComponent(q));j=await r.json()}catch(e){$('#results').innerHTML='<p class="text-red-500 text-sm font-bold">서버 응답이 늦어지고 있어요. 잠시 후 다시 검색해주세요.</p>';return}
 if(!Array.isArray(j)){$('#results').innerHTML=`<p class="text-red-500 text-sm font-bold">${esc(j?.error||'검색 오류가 발생했어요. 잠시 후 다시 시도해주세요.')}</p>`;return}
-if(!j.length){$('#results').innerHTML='<p class="text-gray-400 text-sm font-bold">검색 결과가 없어요. 학교명을 다시 확인해주세요.</p>';return}
+if(!j.length){$('#results').innerHTML=q.includes('유치원')
+  ?'<div class="bg-violet-50 border-2 border-violet-200 rounded-2xl p-4 text-sm font-bold text-violet-800 leading-relaxed">🧒 유치원은 나이스 개방 API에서 제공되지 않아 검색이 안 돼요.<br>대신 아래 <b>📄 월간식단 엑셀 파일로 직접 불러오기</b>에 유치원 월간식단표 엑셀(나이스에서 다운로드)을 올리면 유치원 배식 기준으로 똑같이 사용할 수 있어요.</div>'
+  :'<p class="text-gray-400 text-sm font-bold">검색 결과가 없어요. 학교명을 다시 확인해주세요.</p>';return}
 $('#results').innerHTML=j.map((s,i)=>`<button class="school w-full bg-white border-2 border-gray-200 hover:border-brand-300 rounded-2xl p-4 text-left card-hover" data-i="${i}"><b class="block">${esc(s.schoolName)}</b><span class="text-gray-400 text-xs font-bold">${esc(s.officeName)} · ${esc(s.address)}</span></button>`).join('');
 $$('.school').forEach(b=>b.onclick=()=>{school=j[+b.dataset.i];source='api';localStorage.setItem('meal_school',JSON.stringify(school));localStorage.setItem('meal_school_last',JSON.stringify(school));renderHome()})}
 
@@ -193,7 +196,7 @@ $('#content').innerHTML=`<section class="bg-white border border-gray-200 rounded
 async function loadExcel(e){const f=e.target.files[0];if(!f)return;
 try{const book=XLSX.read(await f.arrayBuffer(),{type:'array'});const ws=book.Sheets[book.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
 let year='',mon='',schoolName='';
-for(const row of rows){for(const cell of row){const text=String(cell||'').trim();const ym=text.match(/조회년월\s*:\s*(\d{4})년\s*(\d{1,2})월/);if(ym){year=ym[1];mon=String(ym[2]).padStart(2,'0')}if(!schoolName&&/학교$/.test(text)&&!/조회|월간|식단/.test(text))schoolName=text;}}
+for(const row of rows){for(const cell of row){const text=String(cell||'').trim();const ym=text.match(/조회년월\s*:\s*(\d{4})년\s*(\d{1,2})월/);if(ym){year=ym[1];mon=String(ym[2]).padStart(2,'0')}if(!schoolName&&/(학교|유치원)$/.test(text)&&!/조회|월간|식단/.test(text))schoolName=text;}}
 if(!year||!mon)throw Error('엑셀에서 조회 연월을 찾지 못했습니다.');
 const parsed={};
 const parseExcelMeal=(cell,dateKey)=>{const raw=String(cell||'').replace(/\r/g,'').trim();if(!raw||raw==='0')return null;
@@ -231,17 +234,17 @@ return `<article class="step-card bg-white border-2 ${hit?'border-red-400 bg-red
     </div>
   </div>
   <div class="mt-4 pt-4 border-t border-gray-100">
-    <div class="flex justify-between text-xs font-black mb-1.5"><span class="text-gray-400">⚖️ ${lv}학생 1인 권장 정량</span><span>${pct}%</span></div>
+    <div class="flex justify-between text-xs font-black mb-1.5"><span class="text-gray-400">⚖️ ${lvName(lv)} 1인 권장 정량</span><span>${pct}%</span></div>
     <div class="h-2 bg-gray-100 rounded-full overflow-hidden"><div class="h-full ${BAR[key]} rounded-full" style="width:${pct}%"></div></div>
     <div class="mt-3 text-xs font-bold text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5">✏️ ${tip}</div>
   </div>
 </article>`}))
 .join('')}
 function aiTips(x){const names=x.items.map(i=>i.name).join(' ');const tips=[];
-if(/국|찌개|탕|전골|라면|짬뽕/.test(names))tips.push(['염','bg-amber-100 text-amber-800','나트륨 저감 가이드',`오늘 국물 메뉴가 있어요. ${schoolLevel()}학생 하루 나트륨 권장량은 2,000mg 이하! 국물은 3분의 1만, 건더기 위주로 먹으면 나트륨을 절반으로 줄일 수 있어요.`]);
+if(/국|찌개|탕|전골|라면|짬뽕/.test(names))tips.push(['염','bg-amber-100 text-amber-800','나트륨 저감 가이드',`오늘 국물 메뉴가 있어요. ${lvName(schoolLevel())} 하루 나트륨 권장량은 2,000mg 이하! 국물은 3분의 1만, 건더기 위주로 먹으면 나트륨을 절반으로 줄일 수 있어요.`]);
 if(/주스|아이스크림|케이크|빵|초콜릿|쿠키|약과|카스테라|식혜|요구르트/.test(names))tips.push(['당','bg-red-100 text-red-800','당류 제한 식생활','달콤한 후식은 정량 1개만! 남은 갈증은 물이나 우유로 채우면 혈당 스파이크를 막고 오후 졸음도 예방할 수 있어요.']);
 if(/샐러드|나물|채소|쌈|무침|숙주|시금치|브로콜리/.test(names))tips.push(['섬','bg-emerald-100 text-emerald-800','식이섬유 청소기 효과','채소 반찬을 먼저 먹으면 식이섬유가 혈당 상승을 늦추고 장 건강까지 지켜줘요. 오늘 채소 반찬부터 시작해보세요!']);
-if(/고기|불고기|제육|닭|돈까스|갈비|생선|고등어|삼치|두부|계란|달걀/.test(names))tips.push(['단','bg-sky-100 text-sky-800','단백질 성장 파워',`성장기 ${schoolLevel()}학생은 단백질이 필수! 오늘 메인요리를 남기지 말고 권장량만큼 먹으면 근육과 키 성장에 도움이 돼요.`]);
+if(/고기|불고기|제육|닭|돈까스|갈비|생선|고등어|삼치|두부|계란|달걀/.test(names))tips.push(['단','bg-sky-100 text-sky-800','단백질 성장 파워',`성장기 ${lvName(schoolLevel())}은 단백질이 필수! 오늘 메인요리를 남기지 말고 권장량만큼 먹으면 근육과 키 성장에 도움이 돼요.`]);
 if(/우유|치즈|요구르트|멸치|뼈/.test(names))tips.push(['칼','bg-violet-100 text-violet-800','칼슘 뼈 튼튼 교실','칼슘이 풍부한 메뉴가 있어요. 비타민D(햇볕)와 함께하면 흡수율이 올라가요. 점심 후 10분 산책 어때요?']);
 if(!tips.length)tips.push(['균','bg-brand-100 text-brand-800','균형 잡힌 식판','오늘은 모든 반찬을 골고루! 편식 없이 다양한 색깔의 음식을 먹는 것이 최고의 영양 습관이에요.']);
 return tips.map(t=>`<div class="flex gap-3 items-start"><div class="w-7 h-7 rounded-full ${t[1]} flex items-center justify-center font-black text-xs shrink-0">${t[0]}</div><div><span class="font-black text-sm block mb-0.5">${t[2]}</span><p class="text-xs text-gray-500 leading-relaxed">${t[3]}</p></div></div>`).join('')}
