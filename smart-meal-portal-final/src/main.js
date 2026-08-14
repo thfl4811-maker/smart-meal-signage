@@ -141,6 +141,7 @@ function bind(){
 function fetchT(url,ms=15000){const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);return fetch(url,{signal:c.signal}).finally(()=>clearTimeout(t))}
 async function findSchools(){const q=$('#q').value.trim();if(q.length<2)return alert('두 글자 이상 입력하세요.');$('#results').innerHTML='<p class="text-gray-400 text-sm">검색 중…</p>';let r,j;try{r=await fetchT('/api/schools?q='+encodeURIComponent(q));j=await r.json()}catch(e){$('#results').innerHTML='<p class="text-red-500 text-sm font-bold">서버 응답이 늦어지고 있어요. 잠시 후 다시 검색해주세요.</p>';return}
 if(!Array.isArray(j)){$('#results').innerHTML=`<p class="text-red-500 text-sm font-bold">${esc(j?.error||'검색 오류가 발생했어요. 잠시 후 다시 시도해주세요.')}</p>`;return}
+j=j.filter(s=>!String(s.schoolName||'').includes('유치원'));
 if(!j.length){$('#results').innerHTML=q.includes('유치원')
   ?'<div class="bg-violet-50 border-2 border-violet-200 rounded-2xl p-4 text-sm font-bold text-violet-800 leading-relaxed">🧒 유치원은 나이스 개방 API에서 제공되지 않아 검색이 안 돼요.<br>대신 아래 <b>📄 월간식단 엑셀 파일로 직접 불러오기</b>에 유치원 월간식단표 엑셀(나이스에서 다운로드)을 올리면 유치원 배식 기준으로 똑같이 사용할 수 있어요.</div>'
   :'<p class="text-gray-400 text-sm font-bold">검색 결과가 없어요. 학교명을 다시 확인해주세요.</p>';return}
