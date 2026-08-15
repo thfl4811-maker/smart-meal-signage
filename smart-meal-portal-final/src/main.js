@@ -501,3 +501,21 @@ $$('[data-st]').forEach(b=>b.onclick=()=>{tab=b.dataset.st;$$('[data-st]').forEa
 await loadApi()}
 
 function icon(n){if(/밥|덮밥/.test(n))return'🍚';if(/국|탕|찌개|스프|면/.test(n))return'🥣';if(/김치|깍두기/.test(n))return'🌶️';if(/샐러드|나물|채소|쌈/.test(n))return'🥗';if(/과일|주스|요구르트|아이스크림|빵/.test(n))return'🍎';return'🍽️'}
+
+
+/* ── 급식소리함 프로필 학교 자동 연동 ── */
+function applySoriProfile(p){try{
+  if(!p||!p.schoolCode||signage||student)return;
+  const cur=JSON.parse(localStorage.getItem('meal_school')||'null');
+  const auto=localStorage.getItem('meal_school_auto')==='1';
+  if(cur&&!auto)return; // 직접 고른 학교는 유지
+  if(cur&&cur.schoolCode===p.schoolCode)return;
+  school={officeCode:p.officeCode,schoolCode:p.schoolCode,schoolName:p.school};
+  source='api';data={};
+  localStorage.setItem('meal_school',JSON.stringify(school));
+  localStorage.setItem('meal_school_last',JSON.stringify(school));
+  localStorage.setItem('meal_school_auto','1');
+  renderHome();
+}catch(_){}}
+window.addEventListener('sori-ready',e=>applySoriProfile(e.detail&&e.detail.profile));
+if(window.SORI)applySoriProfile(window.SORI.profile);
