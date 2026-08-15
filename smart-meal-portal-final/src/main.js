@@ -59,7 +59,7 @@ $('#lgSave').onclick=()=>{legend={green:$('#lg-green').value,blue:$('#lg-blue').
 function normalizeTypes(){Object.values(data).forEach(d=>d.items.forEach(i=>{if(i.type==='self')i.type='selfGreen';else if(i.type==='choiceA'||i.type==='choiceB')i.type='choice';if(!i.type)i.type='normal'}))}
 function localDate(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 const p=new URLSearchParams(location.search);
-let school=JSON.parse(localStorage.getItem('meal_school')||'null'),month=p.get('month')||new Date().toISOString().slice(0,7),data={},date='',tab='day',allergies=new Set(JSON.parse(localStorage.getItem('allergies')||'[]')),allergyOn=localStorage.getItem('allergyOn')==='1',source='api';
+let school=JSON.parse(localStorage.getItem('meal_school')||'null'),month=p.get('month')||new Date().toISOString().slice(0,7),mealCode=(/^[123]$/.test(p.get('meal')||'')?p.get('meal'):null)||localStorage.getItem('signage_meal_code')||'2',data={},date='',tab='day',allergies=new Set(JSON.parse(localStorage.getItem('allergies')||'[]')),allergyOn=localStorage.getItem('allergyOn')==='1',source='api';
 const signage=p.get('mode')==='signage',student=p.get('mode')==='student';
 if(p.get('office'))school={officeCode:p.get('office'),schoolCode:p.get('school'),schoolName:p.get('name')||'학교 급식'};
 window.addEventListener('DOMContentLoaded',()=>student?bootStudent():signage?bootSignage():renderHome());
@@ -124,6 +124,7 @@ function workspace(){return `
     <small class="text-brand-700 font-black text-xs">${source==='api'?'나이스 API':'엑셀 업로드'} · ${schoolLevel()} 기준</small>
     <h2 class="text-xl font-black">${esc(school.schoolName)}</h2>
   </div>
+  ${source==='api'?`<select id="mealSel" title="조식·석식은 해당 급식을 나이스에 등록한 학교만 데이터가 있어요" class="border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold">${[['2','중식'],['1','조식'],['3','석식']].map(x=>`<option value="${x[0]}" ${mealCode===x[0]?'selected':''}>${x[1]}</option>`).join('')}</select>`:''}
   <input id="month" type="month" value="${month}" class="border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold">
   <button id="reload" class="bg-brand-500 hover:bg-brand-600 text-white font-black px-4 py-2.5 rounded-xl text-sm transition-all">식단 불러오기</button>
   <button id="filter" class="bg-red-50 hover:bg-red-100 text-red-700 font-black px-4 py-2.5 rounded-xl text-sm border-2 border-red-200 transition-all">🚨 알레르기</button>
@@ -145,6 +146,7 @@ function bind(){
   if($('#excel'))$('#excel').onchange=loadExcel;
   if($('#reload'))$('#reload').onclick=loadApi;
   if($('#month'))$('#month').onchange=e=>{month=e.target.value;loadApi()};
+  if($('#mealSel'))$('#mealSel').onchange=e=>{mealCode=e.target.value;localStorage.setItem('signage_meal_code',mealCode);loadApi()};
   if($('#filter'))$('#filter').onclick=openFilter;
   if($('#signage'))$('#signage').onclick=openSignage;
   if($('#cleanToggle'))$('#cleanToggle').onclick=()=>{cleanMode=!cleanMode;localStorage.setItem('cleanMode',cleanMode?'1':'0');renderHome()};
@@ -163,10 +165,12 @@ if(!j.length){$('#results').innerHTML=q.includes('유치원')
 $('#results').innerHTML=j.map((s,i)=>`<button class="school w-full bg-white border-2 border-gray-200 hover:border-brand-300 rounded-2xl p-4 text-left card-hover" data-i="${i}"><b class="block">${esc(s.schoolName)}</b><span class="text-gray-400 text-xs font-bold">${esc(s.officeName)} · ${esc(s.address)}</span></button>`).join('');
 $$('.school').forEach(b=>b.onclick=()=>{school=j[+b.dataset.i];source='api';localStorage.setItem('meal_school',JSON.stringify(school));localStorage.setItem('meal_school_last',JSON.stringify(school));renderHome()})}
 
-async function loadApi(){try{$('#content').innerHTML='<div class="bg-white rounded-3xl p-16 text-center text-gray-400">나이스 식단을 불러오는 중입니다.</div>';const r=await fetchT(`/api/meals?office=${school.officeCode}&school=${school.schoolCode}&month=${month.replace('-','')}`,20000),rows=await r.json();if(!r.ok)throw Error(rows.error);data=parseRows(rows);await applySaved();normalizeTypes();setDefaultDate();renderTab()}catch(e){const msg=e.name==='AbortError'?'나이스 서버 응답이 지연되고 있어요.':(e.message||'식단을 불러오지 못했어요.');$('#content').innerHTML=`<div class="bg-white rounded-3xl p-16 text-center"><p class="text-gray-400 font-bold mb-4">${esc(msg)}</p><button id="retryLoad" class="bg-brand-500 hover:bg-brand-600 text-white font-black px-6 py-3 rounded-xl text-sm">🔄 다시 시도</button></div>`;const b=$('#retryLoad');if(b)b.onclick=loadApi}}
-function parseRows(rows){const out={};rows.filter(r=>r.mealCode==='2').forEach(r=>{const d=`${r.date.slice(0,4)}-${r.date.slice(4,6)}-${r.date.slice(6,8)}`;const items=r.dishes.split('<br/>').map(parseDish).filter(Boolean);const nutrient={};String(r.nutrients||'').split(/<br\s*\/?>/i).forEach(x=>{const m=x.match(/^(.+?)(?:\(([^)]+)\))?\s*:\s*([\d.,]+)\s*(.*)$/);if(m)nutrient[m[1].trim()]={value:m[3],unit:(m[2]||m[4]||'').trim()}});out[d]={date:d,items,calories:r.calories,nutrient,origin:r.origin||'',note:'',edited:false}});return out}
+async function loadApi(){try{$('#content').innerHTML=`<div class="bg-white rounded-3xl p-16 text-center text-gray-400">나이스 ${mealLabel()} 식단을 불러오는 중입니다.</div>`;const r=await fetchT(`/api/meals?office=${school.officeCode}&school=${school.schoolCode}&month=${month.replace('-','')}`,20000),rows=await r.json();if(!r.ok)throw Error(rows.error);data=parseRows(rows);await applySaved();normalizeTypes();setDefaultDate();renderTab()}catch(e){const msg=e.name==='AbortError'?'나이스 서버 응답이 지연되고 있어요.':(e.message||'식단을 불러오지 못했어요.');$('#content').innerHTML=`<div class="bg-white rounded-3xl p-16 text-center"><p class="text-gray-400 font-bold mb-4">${esc(msg)}</p><button id="retryLoad" class="bg-brand-500 hover:bg-brand-600 text-white font-black px-6 py-3 rounded-xl text-sm">🔄 다시 시도</button></div>`;const b=$('#retryLoad');if(b)b.onclick=loadApi}}
+function projMonth(){return mealCode==='2'?month:`${month}#${mealCode}`}
+function mealLabel(){return {'1':'조식','2':'중식','3':'석식'}[mealCode]||'중식'}
+function parseRows(rows){const out={};rows.filter(r=>r.mealCode===mealCode).forEach(r=>{const d=`${r.date.slice(0,4)}-${r.date.slice(4,6)}-${r.date.slice(6,8)}`;const items=r.dishes.split('<br/>').map(parseDish).filter(Boolean);const nutrient={};String(r.nutrients||'').split(/<br\s*\/?>/i).forEach(x=>{const m=x.match(/^(.+?)(?:\(([^)]+)\))?\s*:\s*([\d.,]+)\s*(.*)$/);if(m)nutrient[m[1].trim()]={value:m[3],unit:(m[2]||m[4]||'').trim()}});out[d]={date:d,items,calories:r.calories,nutrient,origin:r.origin||'',note:'',edited:false}});return out}
 function parseDish(t){t=t.replace(/<[^>]+>/g,'').trim();if(!t)return null;const al=[];for(const m of t.matchAll(/\(([\d.]+)\)/g))m[1].split('.').map(Number).forEach(n=>n>=1&&n<=19&&al.push(n));let name=t.replace(/\(([\d.]+)\)/g,'').trim();let type='normal';if(/자율/.test(name))type='selfGreen';else if(/\[선택\]/.test(name))type='choice';return{name,allergy:[...new Set(al)],type,category:'',order:0}}
-async function applySaved(){try{const r=await fetchT(`/api/project?office=${school.officeCode}&school=${school.schoolCode}&month=${month}`,10000),j=await r.json();if(j?.payload?.days)data=j.payload.days;if(j?.payload?.legend){legend=j.payload.legend;localStorage.setItem('mealLegend',JSON.stringify(legend))}}catch{}}
+async function applySaved(){try{const r=await fetchT(`/api/project?office=${school.officeCode}&school=${school.schoolCode}&month=${encodeURIComponent(projMonth())}`,10000),j=await r.json();if(j?.payload?.days)data=j.payload.days;if(j?.payload?.legend){legend=j.payload.legend;localStorage.setItem('mealLegend',JSON.stringify(legend))}}catch{}}
 function setDefaultDate(){const today=localDate(new Date());date=data[today]?today:Object.keys(data).sort()[0]||''}
 
 function parseExcelBook(book){
@@ -410,7 +414,7 @@ $$('[data-note]').forEach(el=>el.onchange=()=>{data[el.dataset.note].note=el.val
 $('#legendBtn2').onclick=openLegend;$('#replace').onclick=replaceAll;$('#saveAll').onclick=saveProject}
 function replaceAll(){const a=prompt('찾을 내용'),b=a!==null?prompt('바꿀 내용',''):null;if(a===null||b===null)return;Object.values(data).forEach(d=>d.items.forEach(i=>{i.name=i.name.split(a).join(b)}));renderEdit()}
 async function saveProject(){if(cleanMode){Object.values(data).forEach(d=>{d.items.forEach(i=>{i.name=cleanName(i.name)});d.edited=true})}
-const password=prompt('이 학교의 편집 비밀번호를 입력하세요. 처음 저장할 때 설정됩니다.');if(!password)return;const r=await fetch('/api/project',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({office:school.officeCode,school:school.schoolCode,schoolName:school.schoolName,month,password,payload:{days:data,legend}})}),j=await r.json();alert(r.ok?'저장되었습니다.':j.error)}
+const password=prompt('이 학교의 편집 비밀번호를 입력하세요. 처음 저장할 때 설정됩니다.');if(!password)return;const r=await fetch('/api/project',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({office:school.officeCode,school:school.schoolCode,schoolName:school.schoolName,month:projMonth(),password,payload:{days:data,legend}})}),j=await r.json();alert(r.ok?'저장되었습니다.':j.error)}
 
 /* ═══════ 알레르기 모달 (기존 유지) ═══════ */
 function openFilter(){const m=$('#modal');m.classList.remove('hidden');m.classList.add('flex');
@@ -447,8 +451,8 @@ $('#close').onclick=()=>{m.classList.add('hidden');m.classList.remove('flex')}}
 async function showSignTools(type){
 const isStudent=type==='student';
 const url=isStudent
-  ?`${location.origin}${location.pathname}?mode=student&office=${school.officeCode}&school=${school.schoolCode}&name=${encodeURIComponent(school.schoolName)}&month=${month}`
-  :`${location.origin}${location.pathname}?mode=signage&type=${type}&office=${school.officeCode}&school=${school.schoolCode}&name=${encodeURIComponent(school.schoolName)}&month=${month}`;
+  ?`${location.origin}${location.pathname}?mode=student&office=${school.officeCode}&school=${school.schoolCode}&name=${encodeURIComponent(school.schoolName)}&month=${month}&meal=${mealCode}`
+  :`${location.origin}${location.pathname}?mode=signage&type=${type}&office=${school.officeCode}&school=${school.schoolCode}&name=${encodeURIComponent(school.schoolName)}&month=${month}&meal=${mealCode}`;
 $('#signTools').innerHTML=`
 ${isStudent?`<div class="bg-brand-50 border border-brand-100 rounded-2xl p-4 mb-3 text-left"><b class="text-sm font-black text-brand-800 block mb-1">📱 학생/학부모용 모바일 화면</b><p class="text-xs text-brand-700 font-bold">QR을 급식실·가정통신문에 넣거나, 링크를 학급 단체방에 공유하세요. 학생이 스스로 알레르기를 선택해 안전하게 확인할 수 있어요.</p></div>`:''}
 <canvas id="qr" class="mx-auto my-3"></canvas>
