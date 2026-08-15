@@ -97,10 +97,25 @@ function landing(){const last=JSON.parse(localStorage.getItem('meal_school_last'
     <span class="text-xs font-black text-brand-600 block mb-0.5">최근 사용한 학교 바로가기</span>
     <b class="text-base font-black">${esc(last.schoolName)} →</b>
   </button>`:''}
-  <label class="inline-block mt-8 text-xs text-gray-400 font-bold cursor-pointer hover:text-gray-600 transition-all">
-    📄 월간식단 엑셀 파일로 직접 불러오기
-    <input id="excel" type="file" accept=".xlsx,.xls" class="hidden">
-  </label>
+  <div class="mt-8 bg-white border-2 border-gray-200 rounded-2xl p-5 text-left shadow-sm">
+    <b class="text-lg font-black block mb-3">🧒 유치원 선생님 전용 · 학교 검색이 안 되는 기관</b>
+    <label class="inline-block bg-violet-50 hover:bg-violet-100 text-violet-700 font-black px-5 py-3 rounded-xl text-base border-2 border-violet-200 transition-all cursor-pointer">
+      📄 나이스 월간식단표 엑셀 업로드
+      <input id="excel" type="file" accept=".xlsx,.xls" class="hidden">
+    </label>
+    <p class="text-sm text-gray-500 font-bold mt-3 leading-relaxed">유치원 선생님 전용 또는 학교 검색이 안 되는 학교의 경우, 나이스에서 <b>월간식단표를 엑셀로 다운받아 업로드</b>해 주세요. 유치원은 <b>유치원 어린이 기준 배식량</b>으로 모든 기능이 똑같이 적용됩니다.</p>
+    <details class="mt-3 border-2 border-gray-100 rounded-xl overflow-hidden">
+      <summary class="cursor-pointer px-4 py-3 bg-slate-50 hover:bg-slate-100 text-base font-black text-brand-700">🧒 유치원 선생님 이용 안내 (누르면 펼쳐져요)</summary>
+      <div class="px-4 py-3 text-sm text-gray-600 font-bold leading-relaxed space-y-2">
+        <p>교육부의 공개 자료(나이스 개방포털)에 유치원 급식 정보가 포함되어 있지 않아, 유치원은 학교 이름 검색이 되지 않습니다. 이는 프로그램 오류가 아닌 교육부 정책에 따른 것입니다. 대신 아래 방법으로 초·중·고와 동일하게 이용하실 수 있습니다.</p>
+        <p class="text-gray-800 font-black">이용 방법</p>
+        <p>① 유치원 나이스(급식 메뉴)에서 <b>월간식단표를 엑셀 파일로 저장</b>합니다.</p>
+        <p>② 위의 <b>「📄 나이스 월간식단표 엑셀 업로드」</b> 버튼을 누르고 저장한 파일을 선택합니다.</p>
+        <p>③ 유치원 이름이 자동으로 인식되어 <b>「유치원 배식 가이드」</b>가 열리고, 1인 권장 정량도 <b>유치원 어린이 기준</b>으로 표시됩니다.</p>
+        <p>④ 이후 일간·주간·월간 보기, 🎨 범례 설정, 알레르기 필터, 📺 사이니지·공유 등 모든 기능은 초·중·고와 완전히 동일합니다.</p>
+      </div>
+    </details>
+  </div>
 </section>`}
 
 function workspace(){return `
@@ -143,7 +158,7 @@ async function findSchools(){const q=$('#q').value.trim();if(q.length<2)return a
 if(!Array.isArray(j)){$('#results').innerHTML=`<p class="text-red-500 text-sm font-bold">${esc(j?.error||'검색 오류가 발생했어요. 잠시 후 다시 시도해주세요.')}</p>`;return}
 j=j.filter(s=>!String(s.schoolName||'').includes('유치원'));
 if(!j.length){$('#results').innerHTML=q.includes('유치원')
-  ?'<div class="bg-violet-50 border-2 border-violet-200 rounded-2xl p-4 text-sm font-bold text-violet-800 leading-relaxed">🧒 유치원은 나이스 개방 API에서 제공되지 않아 검색이 안 돼요.<br>대신 아래 <b>📄 월간식단 엑셀 파일로 직접 불러오기</b>에 유치원 월간식단표 엑셀(나이스에서 다운로드)을 올리면 유치원 배식 기준으로 똑같이 사용할 수 있어요.</div>'
+  ?'<div class="bg-violet-50 border-2 border-violet-200 rounded-2xl p-4 text-sm font-bold text-violet-800 leading-relaxed">🧒 유치원은 나이스 개방 API에서 제공되지 않아 검색이 안 돼요.<br>대신 아래 <b>📄 나이스 월간식단표 엑셀 업로드</b> 버튼으로 유치원 월간식단표 엑셀을 올리면 유치원 어린이 기준 배식량으로 똑같이 사용할 수 있어요. (자세한 방법은 아래 "유치원 선생님 이용 안내"를 펼쳐보세요)</div>'
   :'<p class="text-gray-400 text-sm font-bold">검색 결과가 없어요. 학교명을 다시 확인해주세요.</p>';return}
 $('#results').innerHTML=j.map((s,i)=>`<button class="school w-full bg-white border-2 border-gray-200 hover:border-brand-300 rounded-2xl p-4 text-left card-hover" data-i="${i}"><b class="block">${esc(s.schoolName)}</b><span class="text-gray-400 text-xs font-bold">${esc(s.officeName)} · ${esc(s.address)}</span></button>`).join('');
 $$('.school').forEach(b=>b.onclick=()=>{school=j[+b.dataset.i];source='api';localStorage.setItem('meal_school',JSON.stringify(school));localStorage.setItem('meal_school_last',JSON.stringify(school));renderHome()})}
